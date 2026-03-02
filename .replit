@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "postgresql-16"]
 [agent]
 expertMode = true
 
@@ -12,7 +12,6 @@ externalPort = 5000
 [[ports]]
 localPort = 8000
 externalPort = 80
-exposeLocalhost = true
 
 [workflows]
 runButton = "Project"
@@ -34,12 +33,13 @@ args = "Start application"
 name = "Start Backend"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd backend && node src/index.js"
+args = "cd backend && npm install && npm start"
+waitForPort = 8000
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [[workflows.workflow]]
 name = "Start application"
@@ -47,7 +47,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd frontend && npm run dev"
+args = "cd frontend && npm install && npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
@@ -55,5 +55,5 @@ outputType = "webview"
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["bash", "-c", "cd backend && node src/index.js & cd frontend && npm run build && npx serve dist -p 5000 -l 0.0.0.0"]
-build = ["bash", "-c", "cd frontend && npm run build"]
+run = ["bash", "-c", "cd backend && npm start & cd frontend && npm run build && npx serve dist -p 5000 -l 0.0.0.0"]
+build = ["bash", "-c", "cd backend && npm install && cd ../frontend && npm install && npm run build"]
