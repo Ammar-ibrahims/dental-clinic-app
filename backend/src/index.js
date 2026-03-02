@@ -39,7 +39,11 @@ app.post('/api/patients', async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 // Dentists API below
+=======
+// Dentists API
+>>>>>>> 5c5a7d724b1527a443dbe0925130e4977a8560d8
 app.get('/api/dentists', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM dentists ORDER BY name ASC');
