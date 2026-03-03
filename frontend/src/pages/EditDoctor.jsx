@@ -9,6 +9,15 @@ function EditDoctor() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
 
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('success') === 'google_connected') {
+            setSuccess('✅ Google Calendar connected successfully!');
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+
     const [form, setForm] = useState({
         name: '', specialty: '', email: '', contact: '',
         bio: '', years_experience: '', availability: '', is_active: true,
@@ -116,10 +125,25 @@ function EditDoctor() {
                     <input type="checkbox" name="is_active" checked={form.is_active} onChange={handleChange} id="is_active" className="w-4 h-4" />
                     <label htmlFor="is_active" className="text-sm font-semibold text-gray-700">Active</label>
                 </div>
-                <button type="submit" disabled={submitting}
-                    className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:opacity-50 transition">
-                    {submitting ? 'Saving...' : 'Update Doctor'}
-                </button>
+
+                {/* Google Calendar Connect */}
+                <div className="mt-6 pt-6 border-t border-gray-100">
+                    <h3 className="text-lg font-bold text-gray-800 mb-2">Google Calendar Integration</h3>
+                    <p className="text-sm text-gray-500 mb-4">Connect your Google Calendar to automatically block off time when you have other events scheduled, and let us add new appointments directly to your calendar.</p>
+                    <a
+                        href={`/api/auth/google?dentist_id=${id}`}
+                        className="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50 font-semibold text-sm transition"
+                    >
+                        📅 Connect Google Calendar
+                    </a>
+                </div>
+
+                <div className="pt-6">
+                    <button type="submit" disabled={submitting}
+                        className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:opacity-50 transition">
+                        {submitting ? 'Saving...' : 'Update Doctor'}
+                    </button>
+                </div>
             </form>
         </div>
     );

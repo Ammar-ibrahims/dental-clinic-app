@@ -12,13 +12,17 @@ const appointmentFields = [
     { field: 'appointment_time', message: 'Appointment time is required' },
 ];
 
+// GET   /api/appointments/slots?dentist_id=X&date=YYYY-MM-DD
+// ⚠️  This MUST come before /:id so "slots" isn't matched as an id param
+router.get('/slots', appointmentController.getAvailableSlots);
+
 // GET   /api/appointments
 router.get('/', appointmentController.getAll);
 
 // GET   /api/appointments/:id
 router.get('/:id', validateIdParam, appointmentController.getById);
 
-// POST  /api/appointments
+// POST  /api/appointments  (with conflict check)
 router.post('/', validateRequired(appointmentFields), appointmentController.create);
 
 // PATCH /api/appointments/:id/status

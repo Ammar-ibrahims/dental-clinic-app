@@ -24,6 +24,35 @@ export const getAppointmentById = (id) =>
         [id]
     );
 
+/**
+ * Check if a dentist already has an active (non-Cancelled) appointment
+ * at the given date and time.  Returns the conflicting row if one exists.
+ */
+export const checkConflict = (dentist_id, appointment_date, appointment_time) =>
+    pool.query(
+        `SELECT id FROM appointments
+     WHERE dentist_id = $1
+       AND appointment_date = $2
+       AND appointment_time = $3
+       AND status != 'Cancelled'
+     LIMIT 1`,
+        [dentist_id, appointment_date, appointment_time]
+    );
+
+/**
+ * Return all booked (non-Cancelled) time slots for a dentist on a given date.
+ */
+export const getBookedSlots = (dentist_id, date) =>
+    pool.query(
+        `SELECT appointment_time
+     FROM appointments
+     WHERE dentist_id = $1
+       AND appointment_date = $2
+       AND status != 'Cancelled'
+     ORDER BY appointment_time`,
+        [dentist_id, date]
+    );
+
 export const createAppointment = ({ patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status }) =>
     pool.query(
         `INSERT INTO appointments (patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status)

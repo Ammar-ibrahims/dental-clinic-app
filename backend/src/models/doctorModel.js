@@ -23,3 +23,6 @@ export const updateDoctor = (id, { name, specialty, email, contact, bio, years_e
 
 export const deleteDoctor = (id) =>
     pool.query('UPDATE dentists SET is_active=false WHERE id=$1 RETURNING id', [id]);
+
+export const getDoctorTokens = (id) =>
+    pool.query('SELECT google_access_token, google_refresh_token, google_token_expiry FROM dentists WHERE id=$1', [id]);

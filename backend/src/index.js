@@ -11,6 +11,7 @@ import doctorRoutes from './routes/doctorRoutes.js';
 import appointmentRoutes from './routes/appointmentRoutes.js';
 import treatmentRoutes from './routes/treatmentRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
+import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 const port = process.env.PORT || 8000;
@@ -37,6 +38,7 @@ app.use('/api/dentists', doctorRoutes);
 app.use('/api/appointments', appointmentRoutes);
 app.use('/api/treatments', treatmentRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/auth', authRoutes);
 
 // ─── Start Server ──────────────────────────────────────────────
 app.listen(port, '0.0.0.0', () => {

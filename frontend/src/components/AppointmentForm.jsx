@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+// Generate 30-min slots from 09:00 to 16:30
+const generateAllSlots = () => {
+    const slots = [];
+    for (let h = 9; h <= 16; h++) {
+        slots.push(`${h.toString().padStart(2, '0')}:00`);
+        slots.push(`${h.toString().padStart(2, '0')}:30`);
+    }
+    return slots;
+};
+
 function AppointmentForm() {
     const navigate = useNavigate();
 
@@ -19,6 +29,9 @@ function AppointmentForm() {
         treatment_type: '',
         notes: '',
     });
+
+    const [availableSlots, setAvailableSlots] = useState([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
 
     // Fetch dentists and patients for dropdowns
     useEffect(() => {
@@ -43,8 +56,48 @@ function AppointmentForm() {
         fetchData();
     }, []);
 
+    // Fetch available slots when Dentist AND Date are selected
+    useEffect(() => {
+        const fetchSlots = async () => {
+            if (!form.dentist_id || !form.appointment_date) {
+                setAvailableSlots([]);
+                // Do not reset appointment_time here, otherwise user loses selection if date re-renders
+                return;
+            }
+
+            setLoadingSlots(true);
+            try {
+                const res = await fetch(`/api/appointments/slots?dentist_id=${form.dentist_id}&date=${form.appointment_date}`);
+                if (!res.ok) throw new Error('Failed to fetch available slots');
+
+                const data = await res.json();
+                const bookedSlots = data.booked_slots || [];
+
+                // Available = All possible slots MINUS booked slots
+                const allSlots = generateAllSlots();
+                const freeSlots = allSlots.filter((slot) => !bookedSlots.includes(slot));
+
+                setAvailableSlots(freeSlots);
+
+                // If previously selected time is no longer available, clear it
+                if (form.appointment_time && !freeSlots.includes(form.appointment_time.slice(0, 5))) {
+                    setForm(prev => ({ ...prev, appointment_time: '' }));
+                }
+            } catch (err) {
+                setError('Could not load available time slots: ' + err.message);
+            } finally {
+                setLoadingSlots(false);
+            }
+        };
+        fetchSlots();
+    }, [form.dentist_id, form.appointment_date]);
+
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
+    };
+
+    const handleSlotClick = (slot) => {
+        setForm({ ...form, appointment_time: slot });
     };
 
     const handleSubmit = async (e) => {
@@ -53,7 +106,7 @@ function AppointmentForm() {
         setSuccess('');
 
         if (!form.patient_id || !form.dentist_id || !form.appointment_date || !form.appointment_time) {
-            setError('Please fill in all required fields.');
+            setError('Please complete all required fields (including selecting a time slot).');
             return;
         }
 
@@ -66,6 +119,7 @@ function AppointmentForm() {
                     patient_id: parseInt(form.patient_id),
                     dentist_id: parseInt(form.dentist_id),
                     appointment_date: form.appointment_date,
+                    // If slot is "09:00", append ":00" for postgres TIME format just to be safe, though "09:00" works.
                     appointment_time: form.appointment_time,
                     treatment_type: form.treatment_type,
                     notes: form.notes,
@@ -165,29 +219,57 @@ function AppointmentForm() {
                     name="appointment_date"
                     value={form.appointment_date}
                     onChange={handleChange}
+                    // Calculate today's date in local time, not UTC (which causes off-by-one errors)
+                    min={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                     required
                     className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
             </div>
 
-            {/* Time */}
+            {/* Time Slot Picker */}
             <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                     Time <span className="text-red-500">*</span>
                 </label>
-                <input
-                    type="time"
-                    name="appointment_time"
-                    value={form.appointment_time}
-                    onChange={handleChange}
-                    required
-                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
+
+                {!form.dentist_id || !form.appointment_date ? (
+                    <p className="text-sm text-gray-400 italic bg-gray-50 p-3 rounded border border-gray-200">
+                        Please select a Dentist and Date to see available time slots.
+                    </p>
+                ) : loadingSlots ? (
+                    <p className="text-sm text-gray-500 p-3">Checking availability...</p>
+                ) : availableSlots.length === 0 ? (
+                    <p className="text-sm text-red-500 italic bg-red-50 p-3 rounded border border-red-200">
+                        No available slots for this date. Please select another date.
+                    </p>
+                ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-2">
+                        {availableSlots.map((slot) => {
+                            const isSelected = form.appointment_time === slot || form.appointment_time === slot + ":00";
+                            return (
+                                <button
+                                    key={slot}
+                                    type="button"
+                                    onClick={() => handleSlotClick(slot)}
+                                    className={`py-2 rounded text-sm font-semibold transition ${isSelected
+                                        ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
+                                        : 'bg-white border text-gray-700 hover:border-blue-500 hover:text-blue-600'
+                                        }`}
+                                >
+                                    {slot}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* Hidden input to ensure native required validation still works */}
+                <input type="text" name="appointment_time" value={form.appointment_time} readOnly required className="sr-only" />
             </div>
 
             {/* Treatment Type */}
             <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                <label className="block text-sm font-semibold text-gray-700 mb-1 mt-4">
                     Treatment Type
                 </label>
                 <input
