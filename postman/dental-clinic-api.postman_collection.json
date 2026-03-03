@@ -1,0 +1,265 @@
+{
+    "info": {
+        "name": "Dental Clinic API",
+        "description": "REST API for the Dental Clinic Management System — covers Patients, Dentists, Appointments, Treatments, and Dashboard Stats.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "variable": [
+        {
+            "key": "baseUrl",
+            "value": "http://localhost:8000"
+        }
+    ],
+    "item": [
+        {
+            "name": "Health Check",
+            "item": [
+                {
+                    "name": "GET /api/health",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/health"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Patients",
+            "item": [
+                {
+                    "name": "GET all patients",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/patients"
+                    }
+                },
+                {
+                    "name": "GET patient by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/patients/1"
+                    }
+                },
+                {
+                    "name": "POST create patient",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/api/patients",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Charlie Brown\",\n  \"email\": \"charlie@example.com\",\n  \"phone\": \"0300-9999999\",\n  \"date_of_birth\": \"1995-08-20\",\n  \"address\": \"56 Elm St, Islamabad\",\n  \"gender\": \"Male\",\n  \"blood_group\": \"B+\",\n  \"medical_history\": \"None\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "PUT update patient",
+                    "request": {
+                        "method": "PUT",
+                        "url": "{{baseUrl}}/api/patients/1",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Alice Johnson Updated\",\n  \"email\": \"alice.j@example.com\",\n  \"phone\": \"0301-0000001\",\n  \"date_of_birth\": \"1990-05-14\",\n  \"address\": \"12 Oak Street, Lahore\",\n  \"gender\": \"Female\",\n  \"blood_group\": \"A+\",\n  \"medical_history\": \"Updated history\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "DELETE patient",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/api/patients/3"
+                    }
+                },
+                {
+                    "name": "POST patient — VALIDATION ERROR (missing name)",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/api/patients",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"noname@example.com\",\n  \"phone\": \"0300-0000000\"\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Dentists",
+            "item": [
+                {
+                    "name": "GET all dentists",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/dentists"
+                    }
+                },
+                {
+                    "name": "GET dentist by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/dentists/1"
+                    }
+                },
+                {
+                    "name": "POST create dentist",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/api/dentists",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Dr. Ammar Khan\",\n  \"specialty\": \"Oral Surgeon\",\n  \"email\": \"ammar.k@clinic.com\",\n  \"contact\": \"0300-4444444\",\n  \"bio\": \"Experienced oral and maxillofacial surgeon.\",\n  \"years_experience\": 12,\n  \"availability\": \"Mon, Tue, Thu\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "PUT update dentist",
+                    "request": {
+                        "method": "PUT",
+                        "url": "{{baseUrl}}/api/dentists/1",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"name\": \"Dr. Sarah Smith\",\n  \"specialty\": \"Orthodontist\",\n  \"email\": \"sarah.smith@clinic.com\",\n  \"contact\": \"0300-1111111\",\n  \"bio\": \"Updated bio.\",\n  \"years_experience\": 11,\n  \"availability\": \"Mon, Wed, Fri\",\n  \"is_active\": true\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "DELETE dentist (soft delete)",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/api/dentists/1"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Appointments",
+            "item": [
+                {
+                    "name": "GET all appointments",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/appointments"
+                    }
+                },
+                {
+                    "name": "GET appointment by ID",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/appointments/1"
+                    }
+                },
+                {
+                    "name": "POST create appointment",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/api/appointments",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"patient_id\": 1,\n  \"dentist_id\": 2,\n  \"appointment_date\": \"2026-03-10\",\n  \"appointment_time\": \"09:30\",\n  \"treatment_type\": \"Cavity Filling\",\n  \"notes\": \"Patient has mild sensitivity\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "PATCH update appointment status",
+                    "request": {
+                        "method": "PATCH",
+                        "url": "{{baseUrl}}/api/appointments/1/status",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"status\": \"Confirmed\"\n}"
+                        }
+                    }
+                },
+                {
+                    "name": "DELETE appointment",
+                    "request": {
+                        "method": "DELETE",
+                        "url": "{{baseUrl}}/api/appointments/2"
+                    }
+                },
+                {
+                    "name": "POST appointment — VALIDATION ERROR (missing fields)",
+                    "request": {
+                        "method": "POST",
+                        "url": "{{baseUrl}}/api/appointments",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"patient_id\": 1\n}"
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Treatments",
+            "item": [
+                {
+                    "name": "GET all treatments",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/treatments"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Dashboard Stats",
+            "item": [
+                {
+                    "name": "GET dashboard stats",
+                    "request": {
+                        "method": "GET",
+                        "url": "{{baseUrl}}/api/stats"
+                    }
+                }
+            ]
+        }
+    ]
+}
