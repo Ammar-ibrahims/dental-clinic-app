@@ -26,6 +26,7 @@ function AppointmentForm() {
         dentist_id: '',
         appointment_date: '',
         appointment_time: '',
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Karachi',
         treatment_type: '',
         notes: '',
     });
@@ -67,7 +68,7 @@ function AppointmentForm() {
 
             setLoadingSlots(true);
             try {
-                const res = await fetch(`/api/appointments/slots?dentist_id=${form.dentist_id}&date=${form.appointment_date}`);
+                const res = await fetch(`/api/appointments/slots?dentist_id=${form.dentist_id}&date=${form.appointment_date}&timezone=${form.timezone}`);
                 if (!res.ok) throw new Error('Failed to fetch available slots');
 
                 const data = await res.json();
@@ -90,7 +91,7 @@ function AppointmentForm() {
             }
         };
         fetchSlots();
-    }, [form.dentist_id, form.appointment_date]);
+    }, [form.dentist_id, form.appointment_date, form.timezone]);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
@@ -121,6 +122,7 @@ function AppointmentForm() {
                     appointment_date: form.appointment_date,
                     // If slot is "09:00", append ":00" for postgres TIME format just to be safe, though "09:00" works.
                     appointment_time: form.appointment_time,
+                    timezone: form.timezone,
                     treatment_type: form.treatment_type,
                     notes: form.notes,
                     status: 'Pending',
@@ -224,6 +226,32 @@ function AppointmentForm() {
                     required
                     className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
                 />
+            </div>
+
+            {/* Timezone */}
+            <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Timezone <span className="text-red-500">*</span>
+                </label>
+                <select
+                    name="timezone"
+                    value={form.timezone}
+                    onChange={handleChange}
+                    required
+                    className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-gray-50"
+                >
+                    <option value="America/New_York">Eastern Time (US & Canada)</option>
+                    <option value="America/Chicago">Central Time (US & Canada)</option>
+                    <option value="America/Denver">Mountain Time (US & Canada)</option>
+                    <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+                    <option value="Europe/London">London (GMT/BST)</option>
+                    <option value="Europe/Paris">Paris (CET/CEST)</option>
+                    <option value="Asia/Karachi">Pakistan Standard Time (PKT)</option>
+                    <option value="Asia/Dubai">Dubai (GST)</option>
+                    <option value="Asia/Kolkata">India Standard Time (IST)</option>
+                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                    <option value="Australia/Sydney">Sydney (AEST/AEDT)</option>
+                </select>
             </div>
 
             {/* Time Slot Picker */}

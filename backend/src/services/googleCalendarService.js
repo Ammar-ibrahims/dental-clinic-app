@@ -40,7 +40,7 @@ export const createEvent = async (tokens, eventDetails) => {
     }
 };
 
-export const getBusyPeriods = async (tokens, timeMin, timeMax) => {
+export const getBusyPeriods = async (tokens, timeMin, timeMax, timeZone = 'UTC') => {
     try {
         oauth2Client.setCredentials(tokens);
         const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
@@ -49,6 +49,7 @@ export const getBusyPeriods = async (tokens, timeMin, timeMax) => {
             requestBody: {
                 timeMin,
                 timeMax,
+                timeZone,
                 items: [{ id: 'primary' }],
             },
         });

@@ -53,11 +53,11 @@ export const getBookedSlots = (dentist_id, date) =>
         [dentist_id, date]
     );
 
-export const createAppointment = ({ patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status }) =>
+export const createAppointment = ({ patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status, timezone }) =>
     pool.query(
-        `INSERT INTO appointments (patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status)
-     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status || 'Pending']
+        `INSERT INTO appointments (patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status, timezone)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+        [patient_id, dentist_id, appointment_date, appointment_time, treatment_type, notes, status || 'Pending', timezone || 'Asia/Karachi']
     );
 
 export const updateAppointmentStatus = (id, status) =>

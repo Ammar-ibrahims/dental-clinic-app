@@ -24,7 +24,8 @@ export const getById = async (req, res) => {
 };
 
 export const create = async (req, res) => {
-    const { dentist_id, patient_id, appointment_date, appointment_time } = req.body;
+    const { dentist_id, patient_id, appointment_date, appointment_time, timezone } = req.body;
+    const tz = timezone || 'Asia/Karachi';
     try {
         // 1. Check local DB conflict
         const localConflict = await AppointmentModel.checkConflict(
@@ -107,8 +108,8 @@ export const create = async (req, res) => {
                 await googleCalendarService.createEvent(tokens, {
                     summary: `Dental Appointment - ${patientName}`,
                     description: `Treatment: ${req.body.treatment_type || 'N/A'}\nNotes: ${req.body.notes || ''}`,
-                    start: { dateTime: startDateTimeStr, timeZone: 'Asia/Karachi' },
-                    end: { dateTime: endDateTimeStr, timeZone: 'Asia/Karachi' },
+                    start: { dateTime: startDateTimeStr, timeZone: tz },
+                    end: { dateTime: endDateTimeStr, timeZone: tz },
                 });
             } catch (err) {
                 console.error('Failed to sync appointment with Google Calendar:', err);
@@ -151,10 +152,11 @@ export const remove = async (req, res) => {
  * Combines local DB + Google Calendar (if connected).
  */
 export const getAvailableSlots = async (req, res) => {
-    const { dentist_id, date } = req.query; // date is YYYY-MM-DD
+    const { dentist_id, date, timezone } = req.query; // date is YYYY-MM-DD
     if (!dentist_id || !date) {
         return res.status(400).json({ error: 'dentist_id and date query params are required' });
     }
+    const tz = timezone || 'Asia/Karachi';
     try {
         // 1. Get locally booked slots
         const result = await AppointmentModel.getBookedSlots(dentist_id, date);
@@ -171,11 +173,14 @@ export const getAvailableSlots = async (req, res) => {
                     expiry_date: row.google_token_expiry,
                 };
 
-                // Query 00:00 to 23:59 for the date
-                const timeMin = new Date(`${date}T00:00:00`).toISOString();
-                const timeMax = new Date(`${date}T23:59:59`).toISOString();
+                // Query spanning 3 days (UTC) to ensure we perfectly cover the local date regardless of timezone offset
+                const timeMin = new Date(`${date}T00:00:00Z`);
+                timeMin.setDate(timeMin.getDate() - 1);
+                const timeMax = new Date(`${date}T23:59:59Z`);
+                timeMax.setDate(timeMax.getDate() + 1);
 
-                const busyPeriods = await googleCalendarService.getBusyPeriods(tokens, timeMin, timeMax);
+                // Ask Google for busy periods CONVERTED to the requested timezone
+                const busyPeriods = await googleCalendarService.getBusyPeriods(tokens, timeMin.toISOString(), timeMax.toISOString(), tz);
 
                 // Possible clinic slots: 09:00, 09:30, 10:00 ... 16:30
                 const possibleSlots = [];
@@ -186,16 +191,25 @@ export const getAvailableSlots = async (req, res) => {
 
                 // If a possible slot intersects with ANY Google busy period, add it to 'bookedSlots'
                 busyPeriods.forEach(period => {
-                    const googleStart = new Date(period.start);
-                    const googleEnd = new Date(period.end);
+                    // Because we requested `timeZone: tz`, Google responds with `2026-03-05T09:30:00-05:00`
+                    // We slice the first 19 chars to get the exact local time `2026-03-05T09:30:00` natively 
+                    const googleStartStr = period.start.slice(0, 19);
+                    const googleEndStr = period.end.slice(0, 19);
 
                     possibleSlots.forEach(slotTime => {
-                        const slotStart = new Date(`${date}T${slotTime}:00`);
-                        const slotEnd = new Date(slotStart.getTime() + 30 * 60000);
+                        const slotStartStr = `${date}T${slotTime}:00`;
 
-                        // Overlap condition:
+                        // Calculate end string manually
+                        const sh = parseInt(slotTime.slice(0, 2), 10);
+                        const sm = parseInt(slotTime.slice(3, 5), 10);
+                        let eh = sh;
+                        let em = sm + 30;
+                        if (em >= 60) { eh += 1; em -= 60; }
+                        const slotEndStr = `${date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
+
+                        // String-based overlap comparison alphabetically (guarantees local timezone accuracy)
                         // (slotStart < googleEnd) && (slotEnd > googleStart)
-                        if (slotStart < googleEnd && slotEnd > googleStart) {
+                        if (slotStartStr < googleEndStr && slotEndStr > googleStartStr) {
                             if (!bookedSlots.includes(slotTime)) {
                                 bookedSlots.push(slotTime);
                             }

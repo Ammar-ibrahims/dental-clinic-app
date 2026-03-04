@@ -9,6 +9,7 @@ import EditPatient from './pages/EditPatient';
 import Appointments from './pages/Appointments';
 import BookAppointment from './pages/BookAppointment';
 import EditAppointment from './pages/EditAppointment';
+import AdminAppointments from './pages/AdminAppointments';
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
             <Link to="/patients" className="hover:text-blue-600">Patients</Link>
             <Link to="/doctors" className="hover:text-blue-600">Doctors</Link>
             <Link to="/appointments" className="hover:text-blue-600">Appointments</Link>
+            <Link to="/admin/appointments" className="hover:text-blue-600 text-purple-600">Admin</Link>
           </div>
         </nav>
 
@@ -37,6 +39,7 @@ function App() {
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/appointments/new" element={<BookAppointment />} />
           <Route path="/appointments/:id/edit" element={<EditAppointment />} />
+          <Route path="/admin/appointments" element={<AdminAppointments />} />
         </Routes>
       </div>
     </Router>
