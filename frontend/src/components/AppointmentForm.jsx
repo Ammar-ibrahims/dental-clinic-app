@@ -117,7 +117,7 @@ function AppointmentForm() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    patient_id: parseInt(form.patient_id),
+                    patient_id: form.patient_id, // Keep as string for MongoDB IDs
                     dentist_id: parseInt(form.dentist_id),
                     appointment_date: form.appointment_date,
                     // If slot is "09:00", append ":00" for postgres TIME format just to be safe, though "09:00" works.
