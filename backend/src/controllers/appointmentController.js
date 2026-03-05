@@ -2,11 +2,65 @@ import * as AppointmentModel from '../models/appointmentModel.js';
 import * as DoctorModel from '../models/doctorModel.js';
 import * as PatientModel from '../models/patientModel.js';
 import * as googleCalendarService from '../services/googleCalendarService.js';
+import PatientMongo from '../models/Patient.js';
+import mongoose from 'mongoose';
+
+// Helper to check if an ID is a MongoDB ObjectID
+// Update this helper at the top of appointmentController.js
+// A more robust check to prevent "Cast to ObjectId" crashes
+const isMongoId = (id) => {
+    if (!id) return false;
+    const sId = String(id).trim();
+    return sId.length === 24 && /^[0-9a-fA-F]{24}$/.test(sId);
+};
+/**
+ * Helper: Fetches patient name from either SQL or Mongo
+ */
+const getEnrichedPatientName = async (patientId) => {
+    if (!patientId) return 'Unknown Patient';
+
+    const cleanId = typeof patientId === 'string' ? patientId.trim() : patientId;
+
+    try {
+        if (isMongoId(cleanId)) {
+            if (mongoose.connection.readyState === 1) {
+                // We check for both 'fullName' and 'name' just in case
+                const mongoPatient = await PatientMongo.findById(cleanId);
+                if (mongoPatient) {
+                    return mongoPatient.fullName || mongoPatient.name || 'Unnamed Patient';
+                }
+            }
+        } else {
+            const sqlPatientRows = await PatientModel.getPatientById(cleanId);
+            if (sqlPatientRows.rows.length > 0) {
+                const p = sqlPatientRows.rows[0];
+                return p.name || p.fullName || 'Unnamed Patient';
+            }
+        }
+    } catch (err) {
+        console.error(`❌ Enrichment error for ID ${cleanId}:`, err.message);
+    }
+    return 'Unknown Patient';
+};
 
 export const getAll = async (req, res) => {
     try {
         const result = await AppointmentModel.getAllAppointments();
-        res.json(result.rows);
+        const appointments = result.rows;
+
+        const enrichedAppointments = await Promise.all(appointments.map(async (appt) => {
+            const patientName = await getEnrichedPatientName(appt.patient_id);
+
+            // We return EVERY possible field name to satisfy the frontend
+            return {
+                ...appt,
+                patient_name: patientName,
+                name: patientName,
+                Patient: { name: patientName, fullName: patientName }
+            };
+        }));
+
+        res.json(enrichedAppointments);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -15,9 +69,17 @@ export const getAll = async (req, res) => {
 export const getById = async (req, res) => {
     try {
         const result = await AppointmentModel.getAppointmentById(req.params.id);
-        if (result.rows.length === 0)
-            return res.status(404).json({ error: 'Appointment not found' });
-        res.json(result.rows[0]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Appointment not found' });
+
+        const appt = result.rows[0];
+        const patientName = await getEnrichedPatientName(appt.patient_id);
+
+        res.json({
+            ...appt,
+            patient_name: patientName,
+            name: patientName,
+            Patient: { name: patientName }
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -26,103 +88,54 @@ export const getById = async (req, res) => {
 export const create = async (req, res) => {
     const { dentist_id, patient_id, appointment_date, appointment_time, timezone } = req.body;
     const tz = timezone || 'Asia/Karachi';
+
     try {
-        // 1. Check local DB conflict
+        // 1. Check local DB conflict (PostgreSQL)
         const localConflict = await AppointmentModel.checkConflict(
             dentist_id, appointment_date, appointment_time
         );
         if (localConflict.rows.length > 0) {
             return res.status(409).json({
-                error: 'This time slot is already booked in the local system. Please choose another time.',
+                error: 'This time slot is already booked. Please choose another time.',
             });
         }
 
-        // 2. Check Google Calendar conflict
-        let tokens = null;
-        let isGoogleConnected = false;
-        const doctorTokensData = await DoctorModel.getDoctorTokens(dentist_id);
-
-        if (doctorTokensData.rows.length > 0) {
-            const row = doctorTokensData.rows[0];
-            if (row.google_access_token && row.google_refresh_token) {
-                isGoogleConnected = true;
-                tokens = {
-                    access_token: row.google_access_token,
-                    refresh_token: row.google_refresh_token,
-                    expiry_date: row.google_token_expiry,
-                };
-            }
-        }
-
-        if (isGoogleConnected) {
-            // Check Google Calendar busy specific to this 30-min slot
-            // Calculate slot start/end in UTC assuming the clinic works in local time.
-            // For simplicity, we assume the user's local timezone. We need an exact ISO.
-            // Let's create an ISO string for the requested time.
-            const startStr = `${appointment_date}T${appointment_time}`; // e.g. 2026-03-05T09:00
-            const startDate = new Date(startStr);
-            const endDate = new Date(startDate.getTime() + 30 * 60000); // +30 mins
-
-            const timeMin = startDate.toISOString();
-            const timeMax = endDate.toISOString();
-
-            const busyPeriods = await googleCalendarService.getBusyPeriods(tokens, timeMin, timeMax);
-            if (busyPeriods.length > 0) {
-                return res.status(409).json({
-                    error: "This time slot is occupied on the dentist's Google Calendar. Please choose another time.",
-                });
-            }
-        }
-
-        // 3. Create local appointment
+        // 2. Create the appointment in PostgreSQL
         const result = await AppointmentModel.createAppointment(req.body);
-        const newAppointment = result.rows[0];
+        const newAppt = result.rows[0];
 
-        // 4. Also create event in Google Calendar if connected
-        if (isGoogleConnected) {
-            try {
-                // Fetch patient details for the event title
-                const patientResult = await PatientModel.getPatientById(patient_id);
-                const patientName = patientResult.rows[0]?.name || 'Patient';
-
-                // Ensure time has seconds for proper ISO formatting
-                const timeStr = appointment_time.length === 5 ? `${appointment_time}:00` : appointment_time;
-                // Send explicit PKT offset (+05:00) directly to Google Calendar.
-                // We calculate the end time string directly rather than using Date objects which shift to UTC.
-                const startHour = parseInt(appointment_time.slice(0, 2), 10);
-                const startMin = parseInt(appointment_time.slice(3, 5), 10);
-
-                let endHour = startHour;
-                let endMin = startMin + 30;
-                if (endMin >= 60) {
-                    endHour += 1;
-                    endMin -= 60;
+        // 3. SAFE ENRICHMENT: Find the patient name without crashing
+        let patientName = 'Patient';
+        try {
+            // Only search MongoDB if the ID is a valid 24-character string
+            if (isMongoId(patient_id)) {
+                const mongoPatient = await PatientMongo.findById(patient_id);
+                if (mongoPatient) patientName = mongoPatient.fullName || mongoPatient.name;
+            } else {
+                // If it's a number (like 69), look in PostgreSQL instead
+                const sqlPatient = await PatientModel.getPatientById(patient_id);
+                if (sqlPatient.rows.length > 0) {
+                    patientName = sqlPatient.rows[0].name || 'Patient';
                 }
-
-                const endHourStr = endHour.toString().padStart(2, '0');
-                const endMinStr = endMin.toString().padStart(2, '0');
-
-                const startDateTimeStr = `${appointment_date}T${timeStr}`;
-                const endDateTimeStr = `${appointment_date}T${endHourStr}:${endMinStr}:00`;
-
-                await googleCalendarService.createEvent(tokens, {
-                    summary: `Dental Appointment - ${patientName}`,
-                    description: `Treatment: ${req.body.treatment_type || 'N/A'}\nNotes: ${req.body.notes || ''}`,
-                    start: { dateTime: startDateTimeStr, timeZone: tz },
-                    end: { dateTime: endDateTimeStr, timeZone: tz },
-                });
-            } catch (err) {
-                console.error('Failed to sync appointment with Google Calendar:', err);
-                // We don't fail the request since local booking succeeded
             }
+        } catch (enrichError) {
+            console.warn("⚠️ Could not fetch patient name for response, using default.");
         }
 
-        res.status(201).json(newAppointment);
+        // 4. Return the response with the name attached
+        res.status(201).json({
+            ...newAppt,
+            patient_name: patientName,
+            Patient: { name: patientName } // Added for frontend compatibility
+        });
+
     } catch (err) {
+        console.error("❌ Create Appointment Error:", err.message);
         res.status(500).json({ error: err.message });
     }
 };
 
+// ... keep your existing updateStatus, remove, and getAvailableSlots below ...
 export const updateStatus = async (req, res) => {
     const { status } = req.body;
     try {
@@ -146,23 +159,16 @@ export const remove = async (req, res) => {
     }
 };
 
-/**
- * GET /api/appointments/slots?dentist_id=X&date=YYYY-MM-DD
- * Returns the list of booked time slots for a dentist on a given date.
- * Combines local DB + Google Calendar (if connected).
- */
 export const getAvailableSlots = async (req, res) => {
-    const { dentist_id, date, timezone } = req.query; // date is YYYY-MM-DD
+    const { dentist_id, date, timezone } = req.query;
     if (!dentist_id || !date) {
         return res.status(400).json({ error: 'dentist_id and date query params are required' });
     }
     const tz = timezone || 'Asia/Karachi';
     try {
-        // 1. Get locally booked slots
         const result = await AppointmentModel.getBookedSlots(dentist_id, date);
-        const bookedSlots = result.rows.map((r) => r.appointment_time.slice(0, 5)); // "09:00:00" -> "09:00"
+        const bookedSlots = result.rows.map((r) => r.appointment_time.slice(0, 5));
 
-        // 2. Check Google Calendar busy blocks if connected
         const doctorTokensData = await DoctorModel.getDoctorTokens(dentist_id);
         if (doctorTokensData.rows.length > 0) {
             const row = doctorTokensData.rows[0];
@@ -173,33 +179,25 @@ export const getAvailableSlots = async (req, res) => {
                     expiry_date: row.google_token_expiry,
                 };
 
-                // Query spanning 3 days (UTC) to ensure we perfectly cover the local date regardless of timezone offset
                 const timeMin = new Date(`${date}T00:00:00Z`);
                 timeMin.setDate(timeMin.getDate() - 1);
                 const timeMax = new Date(`${date}T23:59:59Z`);
                 timeMax.setDate(timeMax.getDate() + 1);
 
-                // Ask Google for busy periods CONVERTED to the requested timezone
                 const busyPeriods = await googleCalendarService.getBusyPeriods(tokens, timeMin.toISOString(), timeMax.toISOString(), tz);
 
-                // Possible clinic slots: 09:00, 09:30, 10:00 ... 16:30
                 const possibleSlots = [];
                 for (let h = 9; h <= 16; h++) {
                     possibleSlots.push(`${h.toString().padStart(2, '0')}:00`);
                     possibleSlots.push(`${h.toString().padStart(2, '0')}:30`);
                 }
 
-                // If a possible slot intersects with ANY Google busy period, add it to 'bookedSlots'
                 busyPeriods.forEach(period => {
-                    // Because we requested `timeZone: tz`, Google responds with `2026-03-05T09:30:00-05:00`
-                    // We slice the first 19 chars to get the exact local time `2026-03-05T09:30:00` natively 
                     const googleStartStr = period.start.slice(0, 19);
                     const googleEndStr = period.end.slice(0, 19);
 
                     possibleSlots.forEach(slotTime => {
                         const slotStartStr = `${date}T${slotTime}:00`;
-
-                        // Calculate end string manually
                         const sh = parseInt(slotTime.slice(0, 2), 10);
                         const sm = parseInt(slotTime.slice(3, 5), 10);
                         let eh = sh;
@@ -207,8 +205,6 @@ export const getAvailableSlots = async (req, res) => {
                         if (em >= 60) { eh += 1; em -= 60; }
                         const slotEndStr = `${date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
 
-                        // String-based overlap comparison alphabetically (guarantees local timezone accuracy)
-                        // (slotStart < googleEnd) && (slotEnd > googleStart)
                         if (slotStartStr < googleEndStr && slotEndStr > googleStartStr) {
                             if (!bookedSlots.includes(slotTime)) {
                                 bookedSlots.push(slotTime);
@@ -218,7 +214,6 @@ export const getAvailableSlots = async (req, res) => {
                 });
             }
         }
-
         res.json({ dentist_id: parseInt(dentist_id), date, booked_slots: bookedSlots });
     } catch (err) {
         res.status(500).json({ error: err.message });

@@ -3,7 +3,7 @@ import express from 'express';
 import cors from 'cors';
 
 // ─── Config ────────────────────────────────────────────────────
-import './config/db.js'; // initializes pool & logs connection status
+import pool from './config/db.js'; // initializes PostgreSQL pool & logs status
 
 // ─── Route Modules ─────────────────────────────────────────────
 import patientRoutes from './routes/patientRoutes.js';
@@ -21,8 +21,6 @@ app.use(cors());
 app.use(express.json());
 
 // ─── Health Check ──────────────────────────────────────────────
-import pool from './config/db.js';
-
 app.get('/api/health', async (req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -39,6 +37,15 @@ app.use('/api/appointments', appointmentRoutes);
 app.use('/api/treatments', treatmentRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/auth', authRoutes);
+
+// ─── MongoDB Connection (optional - will NOT crash server if unavailable) ─────
+if (process.env.MONGODB_URI) {
+  import('mongoose').then(({ default: mongoose }) => {
+    mongoose.connect(process.env.MONGODB_URI)
+      .then(() => console.log('✅ MongoDB connected'))
+      .catch((err) => console.warn('⚠️  MongoDB not available:', err.message));
+  }).catch(() => { });
+}
 
 // ─── Start Server ──────────────────────────────────────────────
 app.listen(port, '0.0.0.0', () => {

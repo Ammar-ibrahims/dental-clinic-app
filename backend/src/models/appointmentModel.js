@@ -4,21 +4,17 @@ export const getAllAppointments = () =>
     pool.query(`
     SELECT
       a.*,
-      p.name  AS patient_name,
-      p.phone AS patient_phone,
       d.name  AS dentist_name,
       d.specialty
     FROM appointments a
-    JOIN patients p ON a.patient_id = p.id
     JOIN dentists d ON a.dentist_id = d.id
     ORDER BY a.appointment_date DESC, a.appointment_time DESC
   `);
 
 export const getAppointmentById = (id) =>
     pool.query(
-        `SELECT a.*, p.name AS patient_name, d.name AS dentist_name
+        `SELECT a.*, d.name AS dentist_name
      FROM appointments a
-     JOIN patients p ON a.patient_id = p.id
      JOIN dentists d ON a.dentist_id = d.id
      WHERE a.id = $1`,
         [id]
