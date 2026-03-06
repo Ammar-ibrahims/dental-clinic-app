@@ -8,7 +8,7 @@ function AddPatient() {
     const [success, setSuccess] = useState('');
 
     // --- TASK 6 FIX: Get the Backend URL from Environment Variables ---
-    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const API_BASE_URL = 'https://dental-clinic-app-production-13ce.up.railway.app';
 
     const [form, setForm] = useState({
         name: '',

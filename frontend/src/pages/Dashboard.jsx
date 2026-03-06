@@ -7,7 +7,7 @@ function Dashboard() {
 
     // --- TASK 6 FIX: Get the Backend URL from Railway environment variables ---
     // If VITE_API_URL is not set, it defaults to empty string (useful for local proxy)
-    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const API_BASE_URL = 'https://dental-clinic-app-production-13ce.up.railway.app';
 
     useEffect(() => {
         const fetchStats = async () => {
