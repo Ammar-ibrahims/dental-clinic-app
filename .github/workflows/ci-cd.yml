@@ -20,7 +20,7 @@ jobs:
         run: cd backend && npm install
 
       - name: Build Docker Images (Dry Run)
-        run: docker-compose build
+        run: docker compose build
 
   deploy:
     needs: test-and-build
