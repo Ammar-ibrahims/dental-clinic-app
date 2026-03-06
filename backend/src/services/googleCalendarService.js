@@ -6,16 +6,22 @@ const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_REDIRECT_URI
 );
 
-export const getAuthUrl = (dentistId) => {
-    return oauth2Client.generateAuthUrl({
+export const getAuthUrl = (dentistId, loginHint = null) => {
+    const options = {
         access_type: 'offline',
         scope: [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/calendar.events',
         ],
         state: dentistId.toString(),
-        prompt: 'consent', // Force consent screen to get refresh token
-    });
+        prompt: 'select_account consent', // Force account selection and consent screen
+    };
+
+    if (loginHint) {
+        options.login_hint = loginHint;
+    }
+
+    return oauth2Client.generateAuthUrl(options);
 };
 
 export const getTokens = async (code) => {
@@ -36,6 +42,24 @@ export const createEvent = async (tokens, eventDetails) => {
     } catch (error) {
         console.error('Error creating Google Calendar eventDetails:', JSON.stringify(eventDetails));
         console.error('Error creating Google Calendar event:', error.response?.data || error);
+        throw error;
+    }
+};
+
+export const deleteEvent = async (tokens, eventId) => {
+    try {
+        oauth2Client.setCredentials(tokens);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+        await calendar.events.delete({
+            calendarId: 'primary',
+            eventId: eventId,
+        });
+        return true;
+    } catch (error) {
+        console.error('Error deleting Google Calendar event:', error.response?.data || error);
+        // If event is already deleted (410) or not found (404), consider it success
+        if (error.code === 404 || error.code === 410) return true;
         throw error;
     }
 };

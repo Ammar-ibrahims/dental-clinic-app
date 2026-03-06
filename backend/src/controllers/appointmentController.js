@@ -86,7 +86,7 @@ export const getById = async (req, res) => {
 };
 
 export const create = async (req, res) => {
-    const { dentist_id, patient_id, appointment_date, appointment_time, timezone } = req.body;
+    const { dentist_id, patient_id, appointment_date, appointment_time, timezone, treatment_type, notes } = req.body;
     const tz = timezone || 'Asia/Karachi';
 
     try {
@@ -122,11 +122,53 @@ export const create = async (req, res) => {
             console.warn("⚠️ Could not fetch patient name for response, using default.");
         }
 
-        // 4. Return the response with the name attached
+        // 4. GOOGLE CALENDAR SYNC (Background-ish)
+        try {
+            const doctorTokensData = await DoctorModel.getDoctorTokens(dentist_id);
+            if (doctorTokensData.rows.length > 0) {
+                const row = doctorTokensData.rows[0];
+                if (row.google_access_token && row.google_refresh_token) {
+                    const tokens = {
+                        access_token: row.google_access_token,
+                        refresh_token: row.google_refresh_token,
+                        expiry_date: Number(row.google_token_expiry)
+                    };
+
+                    // Calculate Start/End for Google (Ensure RFC3339 format)
+                    let startStr = `${appointment_date}T${appointment_time}`;
+                    if (startStr.split(':').length === 2) startStr += ':00'; // Add :00 if only HH:mm
+
+                    const [h, m] = appointment_time.split(':').map(Number);
+                    let eh = h;
+                    let em = m + 30; // 30-min default
+                    if (em >= 60) { eh += 1; em -= 60; }
+                    const endStr = `${appointment_date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
+
+                    console.log("DEBUG: Sending to Google:", { startStr, endStr, tz });
+
+                    const googleEvent = await googleCalendarService.createEvent(tokens, {
+                        summary: `Dental Appointment - ${patientName}`,
+                        description: `Treatment: ${treatment_type || 'General Checkup'}\nNotes: ${notes || 'N/A'}`,
+                        start: { dateTime: startStr, timeZone: tz },
+                        end: { dateTime: endStr, timeZone: tz },
+                    });
+
+                    if (googleEvent && googleEvent.id) {
+                        await AppointmentModel.updateGoogleEventId(newAppt.id, googleEvent.id);
+                        console.info(`✅ Synced appointment to Google Calendar (ID: ${googleEvent.id}) for Dentist ${dentist_id}`);
+                    }
+                }
+            }
+        } catch (googleError) {
+            const details = googleError.response?.data?.error || googleError.message;
+            console.error("❌ Google Calendar Sync Failed (but booking saved):", JSON.stringify(details));
+        }
+
+        // 5. Return the response
         res.status(201).json({
             ...newAppt,
             patient_name: patientName,
-            Patient: { name: patientName } // Added for frontend compatibility
+            Patient: { name: patientName }
         });
 
     } catch (err) {
@@ -138,22 +180,73 @@ export const create = async (req, res) => {
 // ... keep your existing updateStatus, remove, and getAvailableSlots below ...
 export const updateStatus = async (req, res) => {
     const { status } = req.body;
+    const { id } = req.params;
     try {
-        const result = await AppointmentModel.updateAppointmentStatus(req.params.id, status);
-        if (result.rows.length === 0)
-            return res.status(404).json({ error: 'Appointment not found' });
-        res.json(result.rows[0]);
+        const result = await AppointmentModel.updateAppointmentStatus(id, status);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Appointment not found' });
+        const appointment = result.rows[0];
+
+        // GOOGLE CALENDAR SYNC: Delete if Cancelled
+        if (status === 'Cancelled' && appointment.google_event_id) {
+            try {
+                const doctorTokensData = await DoctorModel.getDoctorTokens(appointment.dentist_id);
+                if (doctorTokensData.rows.length > 0) {
+                    const row = doctorTokensData.rows[0];
+                    if (row.google_access_token && row.google_refresh_token) {
+                        const tokens = {
+                            access_token: row.google_access_token,
+                            refresh_token: row.google_refresh_token,
+                            expiry_date: Number(row.google_token_expiry)
+                        };
+                        await googleCalendarService.deleteEvent(tokens, appointment.google_event_id);
+                        console.info(`🗑️ Deleted Google Calendar event for cancelled appointment ${id}`);
+                    }
+                }
+            } catch (googleError) {
+                console.error("⚠️ Failed to delete Google event on cancellation:", googleError.message);
+            }
+        }
+
+        res.json(appointment);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 };
 
 export const remove = async (req, res) => {
+    const { id } = req.params;
     try {
-        const result = await AppointmentModel.deleteAppointment(req.params.id);
+        // Fetch appointment first so we have the dentist_id and google_event_id
+        const apptRes = await AppointmentModel.getAppointmentById(id);
+        if (apptRes.rows.length === 0) return res.status(404).json({ error: 'Appointment not found' });
+        const appointment = apptRes.rows[0];
+
+        const result = await AppointmentModel.deleteAppointment(id);
         if (result.rows.length === 0)
             return res.status(404).json({ error: 'Appointment not found' });
-        res.json({ message: 'Appointment deleted', id: req.params.id });
+
+        // GOOGLE CALENDAR SYNC: Delete event
+        if (appointment.google_event_id) {
+            try {
+                const doctorTokensData = await DoctorModel.getDoctorTokens(appointment.dentist_id);
+                if (doctorTokensData.rows.length > 0) {
+                    const row = doctorTokensData.rows[0];
+                    if (row.google_access_token && row.google_refresh_token) {
+                        const tokens = {
+                            access_token: row.google_access_token,
+                            refresh_token: row.google_refresh_token,
+                            expiry_date: Number(row.google_token_expiry)
+                        };
+                        await googleCalendarService.deleteEvent(tokens, appointment.google_event_id);
+                        console.info(`🗑️ Deleted Google Calendar event for deleted appointment ${id}`);
+                    }
+                }
+            } catch (googleError) {
+                console.error("⚠️ Failed to delete Google event on deletion:", googleError.message);
+            }
+        }
+
+        res.json({ message: 'Appointment deleted', id: id });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

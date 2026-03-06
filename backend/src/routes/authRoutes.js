@@ -4,28 +4,29 @@ import pool from '../config/db.js';
 
 const router = Router();
 
-// GET /api/auth/google?dentist_id=X
+// GET /api/auth/google?dentist_id=X&email=Y
 router.get('/google', (req, res) => {
-    const { dentist_id } = req.query;
+    const { dentist_id, email } = req.query;
     if (!dentist_id) {
         return res.status(400).json({ error: 'dentist_id is required' });
     }
 
-    const authUrl = googleCalendarService.getAuthUrl(dentist_id);
+    const authUrl = googleCalendarService.getAuthUrl(dentist_id, email);
     res.redirect(authUrl);
 });
 
 // GET /api/auth/google/callback
 router.get('/google/callback', async (req, res) => {
     const { code, state, error } = req.query;
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
 
     if (error) {
         console.error('OAuth Error:', error);
-        return res.redirect('http://localhost:5000/doctors?error=oauth_failed');
+        return res.redirect(`${frontendUrl}/doctors?error=oauth_failed`);
     }
 
     if (!code || !state) {
-        return res.redirect('http://localhost:5000/doctors?error=missing_params');
+        return res.redirect(`${frontendUrl}/doctors?error=missing_params`);
     }
 
     try {
@@ -33,7 +34,6 @@ router.get('/google/callback', async (req, res) => {
         const tokens = await googleCalendarService.getTokens(code);
 
         // Save tokens to DB
-        // google_token_expiry usually needs to be calculated if expiry_date is provided by google
         await pool.query(
             `UPDATE dentists 
              SET google_access_token = $1, 
@@ -44,10 +44,10 @@ router.get('/google/callback', async (req, res) => {
         );
 
         // Redirect back to frontend Edit Doctor page
-        res.redirect(`http://localhost:5000/doctors/${dentist_id}/edit?success=google_connected`);
+        res.redirect(`${frontendUrl}/doctors/${dentist_id}/edit?success=google_connected`);
     } catch (err) {
         console.error('Error in OAuth callback:', err);
-        res.redirect('http://localhost:5000/doctors?error=token_exchange_failed');
+        res.redirect(`${frontendUrl}/doctors?error=token_exchange_failed`);
     }
 });
 

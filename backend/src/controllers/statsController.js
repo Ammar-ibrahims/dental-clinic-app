@@ -2,29 +2,61 @@ import pool from '../config/db.js';
 import PatientMongo from '../models/Patient.js';
 import mongoose from 'mongoose';
 
+// Helper for timeout
+const withTimeout = (promise, ms, name) => {
+    let timeoutFunc;
+    const timeout = new Promise((_, reject) => {
+        timeoutFunc = setTimeout(() => reject(new Error(`${name} timed out after ${ms}ms`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutFunc));
+};
+
 export const getStats = async (req, res) => {
     try {
-        const [sqlPatients, dentists, appointments, todayAppts] = await Promise.all([
-            pool.query('SELECT COUNT(*) FROM patients'),
-            pool.query('SELECT COUNT(*) FROM dentists WHERE is_active = true'),
-            pool.query('SELECT COUNT(*) FROM appointments'),
-            pool.query("SELECT COUNT(*) FROM appointments WHERE appointment_date = CURRENT_DATE"),
-        ]);
+        console.log('--- getStats Called ---');
+        const stats = {
+            total_patients: 0,
+            total_dentists: 0,
+            total_appointments: 0,
+            todays_appointments: 0,
+            sql_patients: 0,
+            mongo_patients: 0
+        };
 
-        let mongoCount = 0;
-        if (mongoose.connection.readyState === 1) {
-            mongoCount = await PatientMongo.countDocuments();
+        try {
+            console.log('Running SQL queries...');
+            const [sqlPatients, dentists, appointments, todayAppts] = await Promise.all([
+                pool.query('SELECT COUNT(*) FROM patients').catch(e => ({ rows: [{ count: 0 }] })),
+                pool.query('SELECT COUNT(*) FROM dentists WHERE is_active = true').catch(e => ({ rows: [{ count: 0 }] })),
+                pool.query('SELECT COUNT(*) FROM appointments').catch(e => ({ rows: [{ count: 0 }] })),
+                pool.query("SELECT COUNT(*) FROM appointments WHERE appointment_date = CURRENT_DATE").catch(e => ({ rows: [{ count: 0 }] })),
+            ]);
+
+            stats.sql_patients = parseInt(sqlPatients.rows[0].count);
+            stats.total_dentists = parseInt(dentists.rows[0].count);
+            stats.total_appointments = parseInt(appointments.rows[0].count);
+            stats.todays_appointments = parseInt(todayAppts.rows[0].count);
+            console.log('SQL queries complete');
+        } catch (sqlErr) {
+            console.error('⚠️ SQL Stats Error:', sqlErr.message);
         }
 
-        res.json({
-            total_patients: parseInt(sqlPatients.rows[0].count) + mongoCount,
-            total_dentists: parseInt(dentists.rows[0].count),
-            total_appointments: parseInt(appointments.rows[0].count),
-            todays_appointments: parseInt(todayAppts.rows[0].count),
-            sql_patients: parseInt(sqlPatients.rows[0].count),
-            mongo_patients: mongoCount
-        });
+        console.log('Checking Mongoose readiness:', mongoose.connection.readyState);
+        if (mongoose.connection.readyState === 1) {
+            try {
+                console.log('Running Mongo query...');
+                stats.mongo_patients = await withTimeout(PatientMongo.countDocuments(), 3000, 'MongoDB query');
+                console.log('Mongo query complete');
+            } catch (mongoErr) {
+                console.error('⚠️ MongoDB Stats Error:', mongoErr.message);
+            }
+        }
+
+        stats.total_patients = stats.sql_patients + stats.mongo_patients;
+        console.log('Returning stats:', stats);
+        res.json(stats);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error('❌ Critical Error in getStats:', err);
+        res.status(500).json({ error: 'Internal Server Error', details: err.message });
     }
 };

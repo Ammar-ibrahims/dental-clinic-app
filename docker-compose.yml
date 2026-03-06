@@ -1,0 +1,79 @@
+services:
+  # 1. PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: clinic_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+
+  # 2. MongoDB Database
+  mongodb:
+    image: mongo:4.4.18
+    container_name: mongo_db
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+  # 3. Backend API
+  # 3. Backend API
+  backend:
+    build: ./backend
+    container_name: dental_backend
+    ports:
+      - "5000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=8000
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=admin
+      - DB_NAME=clinic_db
+      - MONGODB_URI=mongodb://mongodb:27017/dental_clinic_prod
+      # FIXED FOR TASK 6 SECURITY:
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+    depends_on:
+      - db
+      - mongodb
+    networks:
+      - app-network
+
+  # 4. Frontend Web App
+  frontend:
+    build: ./frontend
+    container_name: dental_frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+
+  # 5. Antigravity Demo (Python)
+  antigravity:
+    image: python:3.9-alpine
+    container_name: python_antigravity
+    command: python3 -c "import antigravity"
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:

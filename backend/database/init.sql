@@ -37,6 +37,9 @@ CREATE TABLE IF NOT EXISTS dentists (
     availability      TEXT,          -- e.g. "Mon, Wed, Fri"
     profile_image_url TEXT,
     is_active         BOOLEAN       DEFAULT true,
+    google_access_token TEXT,
+    google_refresh_token TEXT,
+    google_token_expiry BIGINT,
     created_at        TIMESTAMP     DEFAULT NOW(),
     updated_at        TIMESTAMP     DEFAULT NOW()
 );
@@ -46,7 +49,7 @@ CREATE TABLE IF NOT EXISTS dentists (
 -- ============================================================
 CREATE TABLE IF NOT EXISTS appointments (
     id                SERIAL PRIMARY KEY,
-    patient_id        INT           NOT NULL REFERENCES patients(id)  ON DELETE CASCADE,
+    patient_id        VARCHAR(50)   NOT NULL,
     dentist_id        INT           NOT NULL REFERENCES dentists(id)  ON DELETE CASCADE,
     appointment_date  DATE          NOT NULL,
     appointment_time  TIME          NOT NULL,
@@ -54,6 +57,7 @@ CREATE TABLE IF NOT EXISTS appointments (
     status            VARCHAR(50)   NOT NULL DEFAULT 'Pending'
                                     CHECK (status IN ('Pending','Confirmed','Completed','Cancelled')),
     notes             TEXT,
+    timezone          VARCHAR(50)   DEFAULT 'Asia/Karachi',
     created_at        TIMESTAMP     DEFAULT NOW(),
     updated_at        TIMESTAMP     DEFAULT NOW()
 );

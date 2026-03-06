@@ -54,7 +54,7 @@ function AddDoctor() {
             setTimeout(() => {
                 if (form.connect_google_calendar && data.id) {
                     // Redirect to Google OAuth
-                    window.location.href = `/api/auth/google?dentist_id=${data.id}`;
+                    window.location.href = `/api/auth/google?dentist_id=${data.id}&email=${form.email}`;
                 } else {
                     navigate('/doctors');
                 }

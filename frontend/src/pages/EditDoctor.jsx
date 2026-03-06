@@ -131,7 +131,7 @@ function EditDoctor() {
                     <h3 className="text-lg font-bold text-gray-800 mb-2">Google Calendar Integration</h3>
                     <p className="text-sm text-gray-500 mb-4">Connect your Google Calendar to automatically block off time when you have other events scheduled, and let us add new appointments directly to your calendar.</p>
                     <a
-                        href={`/api/auth/google?dentist_id=${id}`}
+                        href={`/api/auth/google?dentist_id=${id}&email=${form.email}`}
                         className="inline-block bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded shadow-sm hover:bg-gray-50 font-semibold text-sm transition"
                     >
                         📅 Connect Google Calendar
