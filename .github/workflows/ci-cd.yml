@@ -17,10 +17,12 @@ jobs:
           node-version: '18'
 
       - name: Install Backend Deps
-        run: cd backend && npm install
+        run: |
+          cd backend
+          npm install
 
       - name: Build Docker Images (Dry Run)
-        run: docker compose build
+        run: docker compose build  # Use space instead of dash
 
   deploy:
     needs: test-and-build
