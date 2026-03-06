@@ -15,6 +15,7 @@ import authRoutes from './routes/authRoutes.js';
 
 const app = express();
 const port = process.env.PORT || 8000;
+console.log(`Application started on port ${port}`);
 
 // ─── Middleware ────────────────────────────────────────────────
 app.use(cors({
