@@ -5,21 +5,33 @@ function Dashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // --- TASK 6 FIX: Get the Backend URL from Railway environment variables ---
+    // If VITE_API_URL is not set, it defaults to empty string (useful for local proxy)
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch('/api/stats');
-                if (!res.ok) throw new Error('Failed to load stats');
+                // FIXED: Use the absolute URL with the variable
+                const res = await fetch(`${API_BASE_URL}/api/stats`);
+
+                if (!res.ok) {
+                    const text = await res.text();
+                    console.error("Server returned non-ok status:", res.status, text);
+                    throw new Error(`Failed to load stats (Status: ${res.status})`);
+                }
+
                 const data = await res.json();
                 setStats(data);
             } catch (err) {
+                console.error("Fetch Error:", err);
                 setError(err.message);
             } finally {
                 setLoading(false);
             }
         };
         fetchStats();
-    }, []);
+    }, [API_BASE_URL]);
 
     const cards = stats
         ? [
@@ -54,7 +66,12 @@ function Dashboard() {
             {!loading && !error && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {cards.map(({ label, value, color }) => {
-                        const [bg, border, labelColor, valueColor] = colorMap[color].split(' ');
+                        const colors = colorMap[color].split(' ');
+                        const bg = colors[0];
+                        const border = colors[1];
+                        const labelColor = colors[2];
+                        const valueColor = colors[3];
+
                         return (
                             <div
                                 key={label}
