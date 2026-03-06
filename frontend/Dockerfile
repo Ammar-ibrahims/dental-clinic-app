@@ -12,10 +12,11 @@ FROM nginx:stable-alpine
 # Copy the build output
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Copy the config directly to the config folder (NOT the template folder)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Use Nginx's official template directory for automatic envsubst
+# This substitutes ${PORT} and other variables automatically at startup
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Force Nginx to use port 80
+# Default PORT if not provided by Railway
+ENV PORT=80
+
 EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
