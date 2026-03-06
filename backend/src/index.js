@@ -17,7 +17,14 @@ const app = express();
 const port = process.env.PORT || 8000;
 
 // ─── Middleware ────────────────────────────────────────────────
-app.use(cors());
+app.use(cors({
+  origin: [
+    'https://front-end-production-a5b0.up.railway.app',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 
 // ─── Health Check ──────────────────────────────────────────────
