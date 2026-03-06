@@ -26,10 +26,10 @@ export const getStats = async (req, res) => {
         try {
             console.log('Running SQL queries...');
             const [sqlPatients, dentists, appointments, todayAppts] = await Promise.all([
-                pool.query('SELECT COUNT(*) FROM patients').catch(e => ({ rows: [{ count: 0 }] })),
-                pool.query('SELECT COUNT(*) FROM dentists WHERE is_active = true').catch(e => ({ rows: [{ count: 0 }] })),
-                pool.query('SELECT COUNT(*) FROM appointments').catch(e => ({ rows: [{ count: 0 }] })),
-                pool.query("SELECT COUNT(*) FROM appointments WHERE appointment_date = CURRENT_DATE").catch(e => ({ rows: [{ count: 0 }] })),
+                withTimeout(pool.query('SELECT COUNT(*) FROM patients'), 3000, 'SQL Patients').catch(e => ({ rows: [{ count: 0 }] })),
+                withTimeout(pool.query('SELECT COUNT(*) FROM dentists WHERE is_active = true'), 3000, 'SQL Dentists').catch(e => ({ rows: [{ count: 0 }] })),
+                withTimeout(pool.query('SELECT COUNT(*) FROM appointments'), 3000, 'SQL Appointments').catch(e => ({ rows: [{ count: 0 }] })),
+                withTimeout(pool.query("SELECT COUNT(*) FROM appointments WHERE appointment_date = CURRENT_DATE"), 3000, 'SQL Today Appts').catch(e => ({ rows: [{ count: 0 }] })),
             ]);
 
             stats.sql_patients = parseInt(sqlPatients.rows[0].count);
