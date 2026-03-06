@@ -9,14 +9,14 @@ RUN npm run build
 # Stage 2: Production
 FROM nginx:stable-alpine
 
-# Copy the build output
+# 1. Copy the built React/Vite files
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# Use Nginx's official template directory for automatic envsubst
-# This substitutes ${PORT} and other variables automatically at startup
-COPY nginx.conf /etc/nginx/templates/default.conf.template
+# 2. Copy the config directly to the standard Nginx location
+# This avoids the "envsubst" crash you are seeing
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Default PORT if not provided by Railway
-ENV PORT=80
-
+# 3. Railway will route traffic to port 80 based on your settings
 EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]
