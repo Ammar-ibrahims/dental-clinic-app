@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
 function AddDoctor() {
     const navigate = useNavigate();
     const [submitting, setSubmitting] = useState(false);
@@ -38,7 +40,7 @@ function AddDoctor() {
                 ...form,
                 years_experience: form.years_experience ? parseInt(form.years_experience) : 0,
             };
-            const res = await fetch('/api/dentists', {
+            const res = await fetch(`${API_BASE_URL}/api/dentists`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
@@ -54,7 +56,7 @@ function AddDoctor() {
             setTimeout(() => {
                 if (form.connect_google_calendar && data.id) {
                     // Redirect to Google OAuth
-                    window.location.href = `/api/auth/google?dentist_id=${data.id}&email=${form.email}`;
+                    window.location.href = `${API_BASE_URL}/api/auth/google?dentist_id=${data.id}&email=${form.email}`;
                 } else {
                     navigate('/doctors');
                 }

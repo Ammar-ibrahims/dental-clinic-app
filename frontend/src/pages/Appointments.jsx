@@ -7,10 +7,14 @@ function Appointments() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // --- TASK 6 FIX: Get the Backend URL from Environment Variables ---
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
     useEffect(() => {
         const fetchAppointments = async () => {
             try {
-                const res = await fetch('/api/appointments');
+                // Fixed: Use absolute URL
+                const res = await fetch(`${API_BASE_URL}/api/appointments`);
                 if (!res.ok) throw new Error('Failed to load appointments');
                 const data = await res.json();
                 setAppointments(data);
@@ -21,12 +25,13 @@ function Appointments() {
             }
         };
         fetchAppointments();
-    }, []);
+    }, [API_BASE_URL]);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this appointment?')) return;
         try {
-            const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+            // Fixed: Use absolute URL
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete appointment');
             setAppointments((prev) => prev.filter((a) => a.id !== id));
         } catch (err) {

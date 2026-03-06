@@ -5,10 +5,14 @@ function AdminAppointments() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
+    // --- TASK 6 FIX: Get the Backend URL from Environment Variables ---
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+
     useEffect(() => {
         const fetchAppointments = async () => {
             try {
-                const res = await fetch('/api/appointments');
+                // Fixed: Use absolute URL
+                const res = await fetch(`${API_BASE_URL}/api/appointments`);
                 if (!res.ok) throw new Error('Failed to load appointments');
                 const data = await res.json();
                 setAppointments(data);
@@ -19,12 +23,13 @@ function AdminAppointments() {
             }
         };
         fetchAppointments();
-    }, []);
+    }, [API_BASE_URL]);
 
     const handleDelete = async (id) => {
         if (!window.confirm('Are you sure you want to delete this appointment?')) return;
         try {
-            const res = await fetch(`/api/appointments/${id}`, { method: 'DELETE' });
+            // Fixed: Use absolute URL
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, { method: 'DELETE' });
             if (!res.ok) throw new Error('Failed to delete appointment');
             setAppointments((prev) => prev.filter((a) => a.id !== id));
         } catch (err) {
@@ -34,7 +39,8 @@ function AdminAppointments() {
 
     const handleStatusChange = async (id, newStatus) => {
         try {
-            const res = await fetch(`/api/appointments/${id}/status`, {
+            // Fixed: Use absolute URL
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: newStatus })
@@ -84,7 +90,7 @@ function AdminAppointments() {
                             {appointments.map((appt) => {
                                 const dateObj = new Date(appt.appointment_date);
                                 const formattedDate = dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-                                const formattedTime = appt.appointment_time.slice(0, 5);
+                                const formattedTime = appt.appointment_time ? appt.appointment_time.slice(0, 5) : '--:--';
 
                                 return (
                                     <tr key={appt.id} className="hover:bg-gray-50 transition">
