@@ -7,7 +7,7 @@ function Patients() {
     const [error, setError] = useState('');
 
     // --- TASK 6 FIX ---
-    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+    const API_BASE_URL = "https://dental-clinic-app-production-13ce.up.railway.app";
 
     useEffect(() => {
         const fetchPatients = async () => {
