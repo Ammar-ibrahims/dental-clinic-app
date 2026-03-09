@@ -98,4 +98,51 @@ function AddPatient() {
                 <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1">Gender</label>
                     <select name="gender" value={form.gender} onChange={handleChange}
-                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 f
+                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Blood Group</label>
+                    <select name="blood_group" value={form.blood_group} onChange={handleChange}
+                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400">
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Address</label>
+                    <textarea name="address" value={form.address} onChange={handleChange} rows={2}
+                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Medical History</label>
+                    <textarea name="medical_history" value={form.medical_history} onChange={handleChange} rows={3}
+                        className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400"
+                        placeholder="Any previous conditions, allergies, etc." />
+                </div>
+
+                <button type="submit" disabled={submitting}
+                    className="w-full bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 disabled:opacity-50 transition">
+                    {submitting ? 'Creating...' : 'Create Patient'}
+                </button>
+
+            </form>
+        </div>
+    );
+}
+
+export default AddPatient;
