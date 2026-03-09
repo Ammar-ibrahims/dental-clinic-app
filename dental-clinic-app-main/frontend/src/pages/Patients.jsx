@@ -13,6 +13,7 @@ function Patients() {
     useEffect(() => {
         const fetchPatients = async () => {
             try {
+                console.log("Fetching patients from:", `${API_BASE_URL}/api/patients`);
                 const res = await fetch(`${API_BASE_URL}/api/patients`);
 
                 if (!res.ok) {
