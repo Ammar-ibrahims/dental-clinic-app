@@ -1,0 +1,45 @@
+name: Dental App CI-CD
+
+on:
+  push:
+    branches: [ develop ]
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Build Frontend
+        working-directory: ./dental-clinic-app-main/frontend
+        run: |
+          npm install
+          npm run build
+
+  deploy:
+    needs: test-and-build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy Frontend to Railway
+        working-directory: ./dental-clinic-app-main/frontend
+        run: railway up --detach --service front-end-production-a5b0
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      - name: Deploy Backend to Railway
+        working-directory: ./dental-clinic-app-main/backend
+        run: railway up --detach --service dental-clinic-app-production-13ce
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
