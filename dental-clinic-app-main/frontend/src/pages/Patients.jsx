@@ -7,7 +7,7 @@ function Patients() {
     const [error, setError] = useState('');
 
     // Backend URL
-    const API_BASE_URL = "https://dental-clinic-app-production-13ce.up.railway.app";
+    const API_BASE_URL = "dental-clinic-app-production-13ce.up.railway.app";
 
     useEffect(() => {
         const fetchPatients = async () => {
