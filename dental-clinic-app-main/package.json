@@ -3,17 +3,24 @@
   "version": "1.0.0",
   "description": "A full-stack Dental Clinic Management System using React, Node.js, and AI agents.",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+  "scripts": {},
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/s3-request-presigner": "^3.1006.0",
     "better-sqlite3": "^12.6.2",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "google-libphonenumber": "^3.2.44",
+    "libphonenumber-js": "^1.12.39",
     "mongodb": "^7.1.0",
+    "pg": "^8.20.0",
+    "phone": "^3.1.71",
     "react-router-dom": "^7.13.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.4.0"
   }
 }

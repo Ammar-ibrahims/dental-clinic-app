@@ -1,33 +1,50 @@
 import { google } from 'googleapis';
 
+// --- AWS PRODUCTION REDIRECT URI ---
+// Google is very strict: This must match what you put in the Google Console EXACTLY.
+const REDIRECT_URI = 'http://16.170.201.132.nip.io:8000/api/auth/google/callback';
+
 const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,
     process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI
+    REDIRECT_URI
 );
 
 export const getAuthUrl = (dentistId, loginHint = null) => {
     const options = {
-        access_type: 'offline',
+        access_type: 'offline', // Required to get the refresh_token
         scope: [
             'https://www.googleapis.com/auth/calendar',
             'https://www.googleapis.com/auth/calendar.events',
         ],
         state: dentistId.toString(),
-        prompt: 'select_account consent', // Force account selection and consent screen
+
+        // --- THE FIX FOR ACCOUNT SELECTION ---
+        // 'select_account' forces Google to show the account picker.
+        // 'consent' ensures we get a fresh refresh_token every time.
+        prompt: 'select_account consent',
+
+        // Explicitly pass the redirect_uri to prevent Error 400
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || REDIRECT_URI
     };
 
-    if (loginHint) {
-        options.login_hint = loginHint;
-    }
+    // We REMOVE login_hint here. 
+    // If we send login_hint, Google tries to log into that specific account automatically.
+    // By removing it, Google is forced to ask "Which account do you want to use?"
 
     return oauth2Client.generateAuthUrl(options);
 };
 
 export const getTokens = async (code) => {
-    const { tokens } = await oauth2Client.getToken(code);
+    // The redirect_uri must be provided here to match the one used in getAuthUrl
+    const { tokens } = await oauth2Client.getToken({
+        code: code,
+        redirect_uri: process.env.GOOGLE_REDIRECT_URI || REDIRECT_URI
+    });
     return tokens;
 };
+
+// ... keep your other functions (createEvent, deleteEvent, getBusyPeriods) as they were ...
 
 export const createEvent = async (tokens, eventDetails) => {
     try {
@@ -40,7 +57,6 @@ export const createEvent = async (tokens, eventDetails) => {
         });
         return res.data;
     } catch (error) {
-        console.error('Error creating Google Calendar eventDetails:', JSON.stringify(eventDetails));
         console.error('Error creating Google Calendar event:', error.response?.data || error);
         throw error;
     }
@@ -58,7 +74,6 @@ export const deleteEvent = async (tokens, eventId) => {
         return true;
     } catch (error) {
         console.error('Error deleting Google Calendar event:', error.response?.data || error);
-        // If event is already deleted (410) or not found (404), consider it success
         if (error.code === 404 || error.code === 410) return true;
         throw error;
     }

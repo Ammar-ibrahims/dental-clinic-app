@@ -1,16 +1,84 @@
 import { Router } from 'express';
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import * as googleCalendarService from '../services/googleCalendarService.js';
 import pool from '../config/db.js';
 
 const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'your_super_secret_key';
+
+// ---------------------------------------------------------
+// 1. USER REGISTRATION (Creates User + Patient record)
+// ---------------------------------------------------------
+router.post('/register', async (req, res) => {
+    const { name, email, password, role } = req.body; // role: 'admin' or 'patient'
+
+    try {
+        // Check if user exists
+        const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (existing.rows.length > 0) return res.status(400).json({ error: "Email already registered" });
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Save to users table
+        const userResult = await pool.query(
+            'INSERT INTO users (email, password, role) VALUES ($1, $2, $3) RETURNING id, email, role',
+            [email, hashedPassword, role || 'patient']
+        );
+        const newUser = userResult.rows[0];
+
+        // If it's a patient, also create a record in the patients table to link them
+        if (newUser.role === 'patient') {
+            await pool.query(
+                'INSERT INTO patients (user_id, name, email) VALUES ($1, $2, $3)',
+                [newUser.id, name, email]
+            );
+        }
+
+        res.status(201).json({ message: "User registered successfully", user: newUser });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------------------------------------------------------
+// 2. USER LOGIN (Returns Token + Role)
+// ---------------------------------------------------------
+router.post('/login', async (req, res) => {
+    const { email, password } = req.body;
+    try {
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        const user = result.rows[0];
+
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return res.status(401).json({ error: "Invalid email or password" });
+        }
+
+        // Create a token that contains the user ID and their ROLE
+        const token = jwt.sign(
+            { id: user.id, role: user.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.json({
+            token,
+            role: user.role,
+            message: `Logged in as ${user.role}`
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---------------------------------------------------------
+// 3. GOOGLE OAUTH ROUTES (Existing)
+// ---------------------------------------------------------
 
 // GET /api/auth/google?dentist_id=X&email=Y
 router.get('/google', (req, res) => {
     const { dentist_id, email } = req.query;
-    if (!dentist_id) {
-        return res.status(400).json({ error: 'dentist_id is required' });
-    }
-
+    if (!dentist_id) return res.status(400).json({ error: 'dentist_id is required' });
     const authUrl = googleCalendarService.getAuthUrl(dentist_id, email);
     res.redirect(authUrl);
 });
@@ -18,35 +86,22 @@ router.get('/google', (req, res) => {
 // GET /api/auth/google/callback
 router.get('/google/callback', async (req, res) => {
     const { code, state, error } = req.query;
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const frontendUrl = 'https://dental-frontend-production-29ef.up.railway.app';
 
-    if (error) {
-        console.error('OAuth Error:', error);
-        return res.redirect(`${frontendUrl}/doctors?error=oauth_failed`);
-    }
-
-    if (!code || !state) {
-        return res.redirect(`${frontendUrl}/doctors?error=missing_params`);
-    }
+    if (error) return res.redirect(`${frontendUrl}/doctors?error=oauth_failed`);
+    if (!code || !state) return res.redirect(`${frontendUrl}/doctors?error=missing_params`);
 
     try {
         const dentist_id = parseInt(state, 10);
         const tokens = await googleCalendarService.getTokens(code);
 
-        // Save tokens to DB
         await pool.query(
-            `UPDATE dentists 
-             SET google_access_token = $1, 
-                 google_refresh_token = $2, 
-                 google_token_expiry = $3 
-             WHERE id = $4`,
+            `UPDATE dentists SET google_access_token = $1, google_refresh_token = $2, google_token_expiry = $3 WHERE id = $4`,
             [tokens.access_token, tokens.refresh_token, tokens.expiry_date, dentist_id]
         );
 
-        // Redirect back to frontend Edit Doctor page
-        res.redirect(`${frontendUrl}/doctors/${dentist_id}/edit?success=google_connected`);
+        res.redirect(`${frontendUrl}/doctors/edit/${dentist_id}?success=google_connected`);
     } catch (err) {
-        console.error('Error in OAuth callback:', err);
         res.redirect(`${frontendUrl}/doctors?error=token_exchange_failed`);
     }
 });

@@ -3,7 +3,7 @@ import * as statsController from '../controllers/statsController.js';
 
 const router = Router();
 
-// GET /api/stats
+// This links the URL /api/stats to the function in your controller
 router.get('/', statsController.getStats);
 
 export default router;

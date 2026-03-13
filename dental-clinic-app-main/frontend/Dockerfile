@@ -1,22 +1,23 @@
-# Stage 1: Build
-FROM node:18-alpine AS build
+# Build Stage
+FROM node:18-alpine as build
 WORKDIR /app
+
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 COPY package*.json ./
 RUN npm install
 COPY . .
+
 RUN npm run build
 
-# Stage 2: Production
+# Production Stage
 FROM nginx:stable-alpine
-
-# 1. Copy the built React/Vite files
 COPY --from=build /app/dist /usr/share/nginx/html
 
-# 2. Copy the config directly to the standard Nginx location
-# This avoids the "envsubst" crash you are seeing
+# --- THE MISSING LINE: Copy your custom config ---
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# ------------------------------------------------
 
-# 3. Railway will route traffic to port 80 based on your settings
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]

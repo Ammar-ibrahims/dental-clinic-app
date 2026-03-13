@@ -8,42 +8,44 @@ function AppointmentCard({ appointment, onDelete }) {
         Completed: 'bg-blue-100 text-blue-700',
     };
 
-    const colorClass = statusColors[appointment.status] || 'bg-gray-100 text-gray-700';
+    const colorClass = statusColors[appointment?.status] || 'bg-gray-100 text-gray-700';
 
     return (
-        <div className="bg-white p-4 rounded-lg shadow-sm border-l-4 border-blue-500 flex justify-between items-center mb-3">
+        <div className="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500 flex justify-between items-center mb-3 hover:shadow-md transition">
             <div>
-                <h3 className="font-bold text-gray-800">{appointment.patient_name}</h3>
-                <p className="text-sm text-gray-500">
-                    Dr. {appointment.dentist_name}
-                    {appointment.specialty ? ` — ${appointment.specialty}` : ''}
+                <h3 className="font-bold text-gray-800">
+                    {/* Backend sends patient_name from MongoDB/SQL enrichment */}
+                    {appointment?.patient_name || appointment?.name || 'Unnamed Patient'}
+                </h3>
+                <p className="text-sm text-gray-600">
+                    <span className="font-semibold text-blue-600">Dr. {appointment?.dentist_name || 'Doctor'}</span>
+                    {appointment?.specialty ? ` — ${appointment.specialty}` : ''}
                 </p>
-                <p className="text-sm text-gray-400">
-                    {appointment.appointment_date
-                        ? new Date(appointment.appointment_date).toLocaleDateString()
-                        : ''}
-                    {appointment.appointment_time ? ` at ${appointment.appointment_time}` : ''}
+                <p className="text-sm text-gray-500 mt-1">
+                    📅 {appointment?.appointment_date ? new Date(appointment.appointment_date).toLocaleDateString() : 'N/A'}
+                    {appointment?.appointment_time ? ` at ${appointment.appointment_time.slice(0, 5)}` : ''}
                 </p>
-                {appointment.treatment_type && (
-                    <p className="text-xs text-gray-400 italic mt-1">{appointment.treatment_type}</p>
-                )}
             </div>
+
             <div className="flex items-center gap-3">
                 <span className={`px-3 py-1 rounded-full text-xs font-bold ${colorClass}`}>
-                    {appointment.status}
+                    {appointment?.status || 'Pending'}
                 </span>
+
+                {/* FIXED: Path swapped to match App.jsx route pattern */}
                 <Link
-                    to={`/appointments/${appointment.id}/edit`}
-                    className="text-blue-400 hover:text-blue-600 text-sm font-bold px-2 py-1 rounded hover:bg-blue-50 transition"
-                    title="Edit status"
+                    to={`/appointments/edit/${appointment?.id}`}
+                    className="text-blue-500 hover:text-blue-700 bg-blue-50 p-2 rounded-lg transition"
+                    title="Edit Appointment"
                 >
                     ✎
                 </Link>
+
                 {onDelete && (
                     <button
                         onClick={() => onDelete(appointment.id)}
-                        className="text-red-400 hover:text-red-600 text-sm font-bold px-2 py-1 rounded hover:bg-red-50 transition"
-                        title="Delete appointment"
+                        className="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded-lg transition"
+                        title="Delete"
                     >
                         ✕
                     </button>

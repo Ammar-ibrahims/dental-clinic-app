@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import * as appointmentController from '../controllers/appointmentController.js';
 import { validateRequired, validateIdParam } from '../middleware/validate.js';
+import { authorize } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
@@ -12,15 +13,17 @@ const appointmentFields = [
     { field: 'appointment_time', message: 'Appointment time is required' },
 ];
 
-// GET   /api/appointments/slots?dentist_id=X&date=YYYY-MM-DD
-// ⚠️  This MUST come before /:id so "slots" isn't matched as an id param
-router.get('/slots', appointmentController.getAvailableSlots);
+// --- FIXED: Changed /slots to /available-slots to match Frontend ---
+// This MUST stay above /:id
+router.get('/available-slots', appointmentController.getAvailableSlots);
 
 // GET   /api/appointments
 router.get('/', appointmentController.getAll);
 
 // GET   /api/appointments/:id
 router.get('/:id', validateIdParam, appointmentController.getById);
+
+router.get('/me', authorize(['patient']), appointmentController.getMyAppointments);
 
 // POST  /api/appointments  (with conflict check)
 router.post('/', validateRequired(appointmentFields), appointmentController.create);
@@ -37,3 +40,6 @@ router.patch(
 router.delete('/:id', validateIdParam, appointmentController.remove);
 
 export default router;
+
+// This ensures only the logged-in patient can see their own appointments
+router.get('/me', authorize(['patient']), appointmentController.getMyAppointments);
