@@ -1,0 +1,46 @@
+[
+  {
+    "column_name": "id",
+    "data_type": "integer"
+  },
+  {
+    "column_name": "user_id",
+    "data_type": "integer"
+  },
+  {
+    "column_name": "name",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "email",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "phone",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "date_of_birth",
+    "data_type": "date"
+  },
+  {
+    "column_name": "gender",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "blood_group",
+    "data_type": "character varying"
+  },
+  {
+    "column_name": "address",
+    "data_type": "text"
+  },
+  {
+    "column_name": "medical_history",
+    "data_type": "text"
+  },
+  {
+    "column_name": "created_at",
+    "data_type": "timestamp without time zone"
+  }
+]

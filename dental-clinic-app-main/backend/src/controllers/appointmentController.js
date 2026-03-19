@@ -2,6 +2,7 @@ import * as AppointmentModel from '../models/appointmentModel.js';
 import * as DoctorModel from '../models/doctorModel.js';
 import * as PatientModel from '../models/patientModel.js';
 import * as googleCalendarService from '../services/googleCalendarService.js';
+import * as appointmentSyncService from '../services/appointmentSyncService.js';
 import PatientMongo from '../models/Patient.js';
 import mongoose from 'mongoose';
 import pool from '../config/db.js';
@@ -106,64 +107,10 @@ export const create = async (req, res) => {
         const newAppt = result.rows[0];
 
         // 3. SAFE ENRICHMENT: Find the patient name without crashing
-        let patientName = 'Patient';
-        try {
-            // Only search MongoDB if the ID is a valid 24-character string
-            if (isMongoId(patient_id)) {
-                const mongoPatient = await PatientMongo.findById(patient_id);
-                if (mongoPatient) patientName = mongoPatient.fullName || mongoPatient.name;
-            } else {
-                // If it's a number (like 69), look in PostgreSQL instead
-                const sqlPatient = await PatientModel.getPatientById(patient_id);
-                if (sqlPatient.rows.length > 0) {
-                    patientName = sqlPatient.rows[0].name || 'Patient';
-                }
-            }
-        } catch (enrichError) {
-            console.warn("⚠️ Could not fetch patient name for response, using default.");
-        }
+        const patientName = await getEnrichedPatientName(newAppt.patient_id);
 
-        // 4. GOOGLE CALENDAR SYNC (Background-ish)
-        try {
-            const doctorTokensData = await DoctorModel.getDoctorTokens(dentist_id);
-            if (doctorTokensData.rows.length > 0) {
-                const row = doctorTokensData.rows[0];
-                if (row.google_access_token && row.google_refresh_token) {
-                    const tokens = {
-                        access_token: row.google_access_token,
-                        refresh_token: row.google_refresh_token,
-                        expiry_date: Number(row.google_token_expiry)
-                    };
-
-                    // Calculate Start/End for Google (Ensure RFC3339 format)
-                    let startStr = `${appointment_date}T${appointment_time}`;
-                    if (startStr.split(':').length === 2) startStr += ':00'; // Add :00 if only HH:mm
-
-                    const [h, m] = appointment_time.split(':').map(Number);
-                    let eh = h;
-                    let em = m + 30; // 30-min default
-                    if (em >= 60) { eh += 1; em -= 60; }
-                    const endStr = `${appointment_date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
-
-                    console.log("DEBUG: Sending to Google:", { startStr, endStr, tz });
-
-                    const googleEvent = await googleCalendarService.createEvent(tokens, {
-                        summary: `Dental Appointment - ${patientName}`,
-                        description: `Treatment: ${treatment_type || 'General Checkup'}\nNotes: ${notes || 'N/A'}`,
-                        start: { dateTime: startStr, timeZone: tz },
-                        end: { dateTime: endStr, timeZone: tz },
-                    });
-
-                    if (googleEvent && googleEvent.id) {
-                        await AppointmentModel.updateGoogleEventId(newAppt.id, googleEvent.id);
-                        console.info(`✅ Synced appointment to Google Calendar (ID: ${googleEvent.id}) for Dentist ${dentist_id}`);
-                    }
-                }
-            }
-        } catch (googleError) {
-            const details = googleError.response?.data?.error || googleError.message;
-            console.error("❌ Google Calendar Sync Failed (but booking saved):", JSON.stringify(details));
-        }
+        // 4. GOOGLE CALENDAR SYNC (Background-ish) using new service
+        appointmentSyncService.syncAppointmentToGoogle(newAppt.id);
 
         // 5. Return the response
         res.status(201).json({
@@ -179,6 +126,126 @@ export const create = async (req, res) => {
 };
 
 // ... keep your existing updateStatus, remove, and getAvailableSlots below ...
+export const update = async (req, res) => {
+    const { id } = req.params;
+    const { dentist_id, appointment_date, appointment_time, treatment_type, notes, timezone } = req.body;
+    const tz = timezone || 'Asia/Karachi';
+
+    try {
+        // 1. Authorization & Existence Check
+        const currentApptRes = await AppointmentModel.getAppointmentById(id);
+        if (currentApptRes.rows.length === 0) return res.status(404).json({ error: 'Appointment not found' });
+
+        const currentAppt = currentApptRes.rows[0];
+
+        // If patient, ensure they own it
+        if (req.user.role === 'patient') {
+            const userId = req.user.id;
+            const patientResult = await pool.query('SELECT id FROM patients WHERE user_id = $1', [userId]);
+            if (patientResult.rows.length === 0 || String(patientResult.rows[0].id) !== String(currentAppt.patient_id)) {
+                return res.status(403).json({ error: 'Not authorized to edit this appointment' });
+            }
+        }
+
+        // 2. Conflict Check (if time/dentist changed)
+        const newDentistId = parseInt(dentist_id);
+        const hasTimeOrDentistChanged = newDentistId !== currentAppt.dentist_id ||
+            appointment_date !== currentAppt.appointment_date ||
+            appointment_time !== currentAppt.appointment_time;
+
+        if (hasTimeOrDentistChanged) {
+            const conflict = await AppointmentModel.checkConflict(newDentistId, appointment_date, appointment_time);
+            if (conflict.rows.length > 0 && conflict.rows[0].id !== parseInt(id)) {
+                return res.status(409).json({ error: 'This time slot is already booked.' });
+            }
+        }
+
+        // 3. Update in PostgreSQL
+        const result = await AppointmentModel.updateAppointment(id, { dentist_id: newDentistId, appointment_date, appointment_time, treatment_type, notes });
+        const updatedAppt = result.rows[0];
+
+        // 4. Update Google Calendar
+        if (currentAppt.google_event_id) {
+            try {
+                const isDentistChanged = newDentistId !== currentAppt.dentist_id;
+                const patientName = await getEnrichedPatientName(currentAppt.patient_id);
+
+                if (isDentistChanged) {
+                    // Delete from old dentist calendar
+                    const oldDocTokens = await DoctorModel.getDoctorTokens(currentAppt.dentist_id);
+                    if (oldDocTokens.rows.length > 0) {
+                        const row = oldDocTokens.rows[0];
+                        if (row.google_access_token && row.google_refresh_token) {
+                            const tokens = { access_token: row.google_access_token, refresh_token: row.google_refresh_token, expiry_date: Number(row.google_token_expiry) };
+                            await googleCalendarService.deleteEvent(tokens, currentAppt.google_event_id);
+                            console.info(`🗑️ Deleted Google Event ${currentAppt.google_event_id} from old dentist`);
+                        }
+                    }
+
+                    // Create for new dentist calendar
+                    const newDocTokens = await DoctorModel.getDoctorTokens(newDentistId);
+                    if (newDocTokens.rows.length > 0) {
+                        const row = newDocTokens.rows[0];
+                        if (row.google_access_token && row.google_refresh_token) {
+                            const tokens = { access_token: row.google_access_token, refresh_token: row.google_refresh_token, expiry_date: Number(row.google_token_expiry) };
+
+                            let startStr = `${appointment_date}T${appointment_time}`;
+                            if (startStr.split(':').length === 2) startStr += ':00';
+                            const [h, m] = appointment_time.split(':').map(Number);
+                            let eh = h; let em = m + 30;
+                            if (em >= 60) { eh += 1; em -= 60; }
+                            const endStr = `${appointment_date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
+
+                            const newEvent = await googleCalendarService.createEvent(tokens, {
+                                summary: `Dental Appointment - ${patientName}`,
+                                description: `Treatment: ${treatment_type || 'General Checkup'}\nNotes: ${notes || 'N/A'}`,
+                                start: { dateTime: startStr, timeZone: tz },
+                                end: { dateTime: endStr, timeZone: tz },
+                            });
+
+                            if (newEvent && newEvent.id) {
+                                await AppointmentModel.updateGoogleEventId(id, newEvent.id);
+                                console.info(`✅ Created new Google Event ${newEvent.id} for new dentist`);
+                            }
+                        }
+                    }
+                } else {
+                    // Dentist same, update event on existing calendar
+                    const docTokens = await DoctorModel.getDoctorTokens(newDentistId);
+                    if (docTokens.rows.length > 0) {
+                        const row = docTokens.rows[0];
+                        if (row.google_access_token && row.google_refresh_token) {
+                            const tokens = { access_token: row.google_access_token, refresh_token: row.google_refresh_token, expiry_date: Number(row.google_token_expiry) };
+
+                            let startStr = `${appointment_date}T${appointment_time}`;
+                            if (startStr.split(':').length === 2) startStr += ':00';
+                            const [h, m] = appointment_time.split(':').map(Number);
+                            let eh = h; let em = m + 30;
+                            if (em >= 60) { eh += 1; em -= 60; }
+                            const endStr = `${appointment_date}T${eh.toString().padStart(2, '0')}:${em.toString().padStart(2, '0')}:00`;
+
+                            await googleCalendarService.updateEvent(tokens, currentAppt.google_event_id, {
+                                summary: `Dental Appointment - ${patientName}`,
+                                description: `Treatment: ${treatment_type || 'General Checkup'}\nNotes: ${notes || 'N/A'}`,
+                                start: { dateTime: startStr, timeZone: tz },
+                                end: { dateTime: endStr, timeZone: tz },
+                            });
+                            console.info(`✅ Updated Google Event ${currentAppt.google_event_id} (Same dentist)`);
+                        }
+                    }
+                }
+            } catch (googleError) {
+                console.error("⚠️ Google Calendar Sync Sync Error during update:", googleError.message);
+            }
+        }
+
+        res.json(updatedAppt);
+    } catch (err) {
+        console.error("❌ Update Appointment Error:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
 export const updateStatus = async (req, res) => {
     const { status } = req.body;
     const { id } = req.params;
@@ -189,23 +256,7 @@ export const updateStatus = async (req, res) => {
 
         // GOOGLE CALENDAR SYNC: Delete if Cancelled
         if (status === 'Cancelled' && appointment.google_event_id) {
-            try {
-                const doctorTokensData = await DoctorModel.getDoctorTokens(appointment.dentist_id);
-                if (doctorTokensData.rows.length > 0) {
-                    const row = doctorTokensData.rows[0];
-                    if (row.google_access_token && row.google_refresh_token) {
-                        const tokens = {
-                            access_token: row.google_access_token,
-                            refresh_token: row.google_refresh_token,
-                            expiry_date: Number(row.google_token_expiry)
-                        };
-                        await googleCalendarService.deleteEvent(tokens, appointment.google_event_id);
-                        console.info(`🗑️ Deleted Google Calendar event for cancelled appointment ${id}`);
-                    }
-                }
-            } catch (googleError) {
-                console.error("⚠️ Failed to delete Google event on cancellation:", googleError.message);
-            }
+            appointmentSyncService.deleteGoogleEvent(id);
         }
 
         res.json(appointment);
@@ -228,23 +279,7 @@ export const remove = async (req, res) => {
 
         // GOOGLE CALENDAR SYNC: Delete event
         if (appointment.google_event_id) {
-            try {
-                const doctorTokensData = await DoctorModel.getDoctorTokens(appointment.dentist_id);
-                if (doctorTokensData.rows.length > 0) {
-                    const row = doctorTokensData.rows[0];
-                    if (row.google_access_token && row.google_refresh_token) {
-                        const tokens = {
-                            access_token: row.google_access_token,
-                            refresh_token: row.google_refresh_token,
-                            expiry_date: Number(row.google_token_expiry)
-                        };
-                        await googleCalendarService.deleteEvent(tokens, appointment.google_event_id);
-                        console.info(`🗑️ Deleted Google Calendar event for deleted appointment ${id}`);
-                    }
-                }
-            } catch (googleError) {
-                console.error("⚠️ Failed to delete Google event on deletion:", googleError.message);
-            }
+            appointmentSyncService.deleteGoogleEvent(id);
         }
 
         res.json({ message: 'Appointment deleted', id: id });

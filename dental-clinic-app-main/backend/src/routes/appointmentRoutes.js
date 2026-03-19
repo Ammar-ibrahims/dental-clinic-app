@@ -18,28 +18,30 @@ const appointmentFields = [
 router.get('/available-slots', appointmentController.getAvailableSlots);
 
 // GET   /api/appointments
-router.get('/', appointmentController.getAll);
+router.get('/', authorize(['admin']), appointmentController.getAll);
 
-// GET   /api/appointments/:id
-router.get('/:id', validateIdParam, appointmentController.getById);
-
+// GET   /api/appointments/me
 router.get('/me', authorize(['patient']), appointmentController.getMyAppointments);
 
+// GET   /api/appointments/:id
+router.get('/:id', authorize(['admin', 'patient']), validateIdParam, appointmentController.getById);
+
 // POST  /api/appointments  (with conflict check)
-router.post('/', validateRequired(appointmentFields), appointmentController.create);
+router.post('/', authorize(['admin', 'patient']), validateRequired(appointmentFields), appointmentController.create);
+
+// PUT   /api/appointments/:id
+router.put('/:id', authorize(['admin', 'patient']), validateIdParam, validateRequired(appointmentFields), appointmentController.update);
 
 // PATCH /api/appointments/:id/status
 router.patch(
     '/:id/status',
+    authorize(['admin', 'patient']),
     validateIdParam,
     validateRequired([{ field: 'status', message: 'Status is required' }]),
     appointmentController.updateStatus
 );
 
 // DELETE /api/appointments/:id
-router.delete('/:id', validateIdParam, appointmentController.remove);
+router.delete('/:id', authorize(['admin']), appointmentController.remove);
 
 export default router;
-
-// This ensures only the logged-in patient can see their own appointments
-router.get('/me', authorize(['patient']), appointmentController.getMyAppointments);

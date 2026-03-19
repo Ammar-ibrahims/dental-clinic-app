@@ -41,7 +41,10 @@ function EditDoctor() {
         const fetchDoctor = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_BASE_URL}/api/doctors/${id}`);
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/doctors/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!res.ok) throw new Error('Doctor not found');
                 const data = await res.json();
                 setForm({
@@ -68,11 +71,25 @@ function EditDoctor() {
         setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
     };
 
+    const handleContactChange = (e) => {
+        let digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+        if (digits.length > 4) {
+            digits = digits.slice(0, 4) + '-' + digits.slice(4);
+        }
+        setForm({ ...form, contact: digits });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError(''); setSuccess('');
         if (!form.name || !form.specialty || !form.email) {
             setError('Name, specialty, and email are required.');
+            return;
+        }
+
+        const digitsOnly = form.contact.replace(/[^0-9]/g, '');
+        if (form.contact && digitsOnly.length !== 11) {
+            setError('Contact number must be exactly 11 digits (e.g. 0300-1234567).');
             return;
         }
         setSubmitting(true);
@@ -82,16 +99,20 @@ function EditDoctor() {
                 years_experience: form.years_experience ? parseInt(form.years_experience) : 0,
             };
 
+            const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/doctors/${id}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(payload),
             });
 
             if (!res.ok) throw new Error('Update failed');
 
             setSuccess('✅ Doctor updated successfully!');
-            setTimeout(() => navigate('/doctors'), 1200);
+            setTimeout(() => navigate('/admin/doctors'), 1200);
         } catch (err) {
             setError('❌ ' + err.message);
         } finally {
@@ -136,7 +157,7 @@ function EditDoctor() {
                         </div>
                         <div>
                             <label htmlFor="contact" className="block text-sm font-semibold text-gray-700 mb-1">Contact</label>
-                            <input id="contact" type="text" name="contact" value={form.contact} onChange={handleChange} className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" />
+                            <input id="contact" type="text" name="contact" value={form.contact} onChange={handleContactChange} placeholder="0300-1234567" maxLength={12} className="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400 outline-none" />
                         </div>
                     </div>
 
@@ -168,7 +189,7 @@ function EditDoctor() {
 
                     {/* Responsive Buttons: Stacked on mobile, side-by-side on desktop */}
                     <div className="pt-6 flex flex-col sm:flex-row gap-3">
-                        <button type="button" onClick={() => navigate('/doctors')}
+                        <button type="button" onClick={() => navigate('/admin/doctors')}
                             className="w-full sm:w-1/3 bg-gray-100 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-200 transition">
                             Cancel
                         </button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 // --- Task 5: Skeleton Loader for the Form ---
 const SkeletonForm = () => (
@@ -15,7 +15,8 @@ const SkeletonForm = () => (
     </div>
 );
 
-function BookAppointment() {
+function BookAppointment({ isEdit = false }) {
+    const { id } = useParams();
     const navigate = useNavigate();
     const [patients, setPatients] = useState([]);
     const [doctors, setDoctors] = useState([]);
@@ -38,25 +39,69 @@ function BookAppointment() {
         notes: ''
     });
 
+    const [initialAppt, setInitialAppt] = useState(null);
+
     useEffect(() => {
         const fetchInitialData = async () => {
             try {
-                const [pRes, dRes] = await Promise.all([
-                    fetch(`${API_BASE_URL}/api/patients`),
-                    fetch(`${API_BASE_URL}/api/doctors`)
-                ]);
-                const pData = await pRes.json();
+                const role = localStorage.getItem('role');
+                const token = localStorage.getItem('token');
+
+                const dRes = await fetch(`${API_BASE_URL}/api/doctors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 const dData = await dRes.json();
-                setPatients(pData);
                 setDoctors(dData);
+
+                if (role === 'admin') {
+                    const pRes = await fetch(`${API_BASE_URL}/api/patients`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const pData = await pRes.json();
+                    setPatients(pData);
+                } else {
+                    const pRes = await fetch(`${API_BASE_URL}/api/patients/me`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const pData = await pRes.json();
+                    setPatients([pData]);
+                    setForm(prev => ({ ...prev, patient_id: pData.id }));
+                }
+
+                if (isEdit && id) {
+                    const aRes = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    const aData = await aRes.json();
+                    if (aRes.ok) {
+                        const formattedDate = aData.appointment_date.split('T')[0];
+                        const formattedTime = aData.appointment_time.slice(0, 5);
+                        const initialData = {
+                            patient_id: aData.patient_id,
+                            dentist_id: aData.dentist_id,
+                            appointment_date: formattedDate,
+                            appointment_time: formattedTime,
+                            timezone: aData.timezone || 'Asia/Karachi',
+                            treatment_type: aData.treatment_type || '',
+                            notes: aData.notes || ''
+                        };
+                        setForm(initialData);
+                        setInitialAppt({
+                            dentist_id: aData.dentist_id,
+                            date: formattedDate,
+                            time: formattedTime
+                        });
+                    }
+                }
             } catch (err) {
-                setError("Failed to load clinic data. Is the backend running?");
+                console.error("Fetch Data Error:", err);
+                setError("Failed to load clinic data.");
             } finally {
                 setLoadingData(false);
             }
         };
         fetchInitialData();
-    }, [API_BASE_URL]);
+    }, [API_BASE_URL, isEdit, id]);
 
     useEffect(() => {
         const fetchSlots = async () => {
@@ -67,7 +112,19 @@ function BookAppointment() {
                     const res = await fetch(`${API_BASE_URL}/api/appointments/available-slots?dentist_id=${form.dentist_id}&date=${form.appointment_date}`);
                     const data = await res.json();
                     if (res.ok) {
-                        setAvailableSlots(data.available_slots || []);
+                        let slots = data.available_slots || [];
+
+                        // If editing and same doctor/date, add the CURRENT time back to the list
+                        if (isEdit && initialAppt &&
+                            parseInt(form.dentist_id) === initialAppt.dentist_id &&
+                            form.appointment_date === initialAppt.date) {
+                            if (!slots.includes(initialAppt.time)) {
+                                slots = [...slots, initialAppt.time];
+                                slots.sort();
+                            }
+                        }
+
+                        setAvailableSlots(slots);
                     } else {
                         throw new Error(data.error || "Failed to fetch slots");
                     }
@@ -79,11 +136,41 @@ function BookAppointment() {
             }
         };
         fetchSlots();
-    }, [form.dentist_id, form.appointment_date, API_BASE_URL]);
+    }, [form.dentist_id, form.appointment_date, API_BASE_URL, isEdit, initialAppt]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const handleCancel = async () => {
+        if (!window.confirm("Are you sure you want to cancel this appointment? This will also remove it from the Google Calendar.")) return;
+
+        setError('');
+        setSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}/status`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status: 'Cancelled' })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Cancellation failed.");
+            }
+
+            setSuccess("🗑️ Appointment cancelled and slot freed!");
+            setTimeout(() => navigate('/appointments'), 1500);
+        } catch (err) {
+            setError(err.message);
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -93,18 +180,25 @@ function BookAppointment() {
         setSubmitting(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/api/appointments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+            const token = localStorage.getItem('token');
+            const url = isEdit ? `${API_BASE_URL}/api/appointments/${id}` : `${API_BASE_URL}/api/appointments`;
+            const method = isEdit ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(form)
             });
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || "Booking failed.");
+                throw new Error(data.error || "Request failed.");
             }
 
-            setSuccess("✅ Appointment confirmed and added to Google Calendar!");
+            setSuccess(isEdit ? "✅ Appointment updated successfully!" : "✅ Appointment confirmed and added to Google Calendar!");
             setTimeout(() => navigate('/appointments'), 1500);
         } catch (err) {
             setError(err.message);
@@ -116,7 +210,9 @@ function BookAppointment() {
     return (
         /* Responsive Padding: p-4 on mobile, p-8 on desktop */
         <div className="p-4 sm:p-8 max-w-2xl mx-auto">
-            <h1 className="text-2xl sm:text-3xl font-black text-gray-800 mb-6 sm:mb-8 text-center">Schedule a Visit</h1>
+            <h1 className="text-2xl sm:text-3xl font-black text-gray-800 mb-6 sm:mb-8 text-center">
+                {isEdit ? 'Reschedule Appointment' : 'Schedule a Visit'}
+            </h1>
 
             {loadingData ? (
                 <SkeletonForm />
@@ -127,14 +223,16 @@ function BookAppointment() {
                     {error && <div className="bg-red-50 text-red-700 p-3 rounded-xl border border-red-200 text-sm mb-4" role="alert">❌ {error}</div>}
                     {success && <div className="bg-green-50 text-green-700 p-3 rounded-xl border border-green-200 text-sm mb-4" role="status">{success}</div>}
 
-                    <div>
-                        <label htmlFor="patient-select" className="block text-sm font-bold text-gray-700 mb-1">Select Patient</label>
-                        <select id="patient-select" name="patient_id" value={form.patient_id} onChange={handleChange} required
-                            className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none">
-                            <option value="">-- Choose Patient --</option>
-                            {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                    </div>
+                    {localStorage.getItem('role') === 'admin' && (
+                        <div>
+                            <label htmlFor="patient-select" className="block text-sm font-bold text-gray-700 mb-1">Select Patient</label>
+                            <select id="patient-select" name="patient_id" value={form.patient_id} onChange={handleChange} required
+                                className="w-full p-3 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-blue-400 outline-none">
+                                <option value="">-- Choose Patient --</option>
+                                {patients.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                            </select>
+                        </div>
+                    )}
 
                     <div>
                         <label htmlFor="doctor-select" className="block text-sm font-bold text-gray-700 mb-1">Select Doctor</label>
@@ -183,13 +281,26 @@ function BookAppointment() {
                             className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-400 outline-none" />
                     </div>
 
-                    <button
-                        type="submit"
-                        disabled={submitting || availableSlots.length === 0}
-                        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black hover:bg-blue-700 disabled:bg-blue-300 shadow-lg transition focus:ring-4 focus:ring-blue-200"
-                    >
-                        {submitting ? 'Confirming...' : 'CONFIRM APPOINTMENT'}
-                    </button>
+                    <div className="flex flex-col gap-3">
+                        <button
+                            type="submit"
+                            disabled={submitting || (availableSlots.length === 0 && !isEdit)}
+                            className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black hover:bg-blue-700 disabled:bg-blue-300 shadow-lg transition focus:ring-4 focus:ring-blue-200"
+                        >
+                            {submitting ? 'Processing...' : (isEdit ? 'UPDATE APPOINTMENT' : 'CONFIRM APPOINTMENT')}
+                        </button>
+
+                        {isEdit && (
+                            <button
+                                type="button"
+                                onClick={handleCancel}
+                                disabled={submitting}
+                                className="w-full bg-red-50 text-red-600 py-3 rounded-2xl font-bold hover:bg-red-100 transition border border-red-100"
+                            >
+                                🗑️ CANCEL APPOINTMENT
+                            </button>
+                        )}
+                    </div>
                 </form>
             )}
         </div>

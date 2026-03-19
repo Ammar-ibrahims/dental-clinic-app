@@ -33,7 +33,10 @@ function Doctors() {
     useEffect(() => {
         const fetchDoctors = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/doctors`);
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/doctors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!res.ok) throw new Error(`Failed to load doctors (Status: ${res.status})`);
                 const data = await res.json();
                 setDoctors(data);
@@ -54,13 +57,15 @@ function Doctors() {
             {/* Responsive Header: Stacks on mobile, side-by-side on desktop */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Doctors</h1>
-                <Link
-                    to="/doctors/new"
-                    className="w-full sm:w-auto text-center bg-blue-600 text-white px-6 py-3 sm:py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-md focus:ring-4 focus:ring-blue-300 outline-none"
-                    aria-label="Add a new doctor"
-                >
-                    + Add Doctor
-                </Link>
+                {localStorage.getItem('role') === 'admin' && (
+                    <Link
+                        to="/admin/doctors/new"
+                        className="w-full sm:w-auto text-center bg-blue-600 text-white px-6 py-3 sm:py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-md focus:ring-4 focus:ring-blue-300 outline-none"
+                        aria-label="Add a new doctor"
+                    >
+                        + Add Doctor
+                    </Link>
+                )}
             </div>
 
             {error && (
@@ -84,9 +89,11 @@ function Doctors() {
                 ) : doctors.length === 0 && !error ? (
                     <div className="col-span-full text-center py-12 border-2 border-dashed border-gray-200 rounded-3xl">
                         <p className="text-gray-500">No doctors found in the system.</p>
-                        <Link to="/doctors/new" className="text-blue-600 font-bold hover:underline mt-2 inline-block">
-                            Add your first doctor now
-                        </Link>
+                        {localStorage.getItem('role') === 'admin' && (
+                            <Link to="/admin/doctors/new" className="text-blue-600 font-bold hover:underline mt-2 inline-block">
+                                Add your first doctor now
+                            </Link>
+                        )}
                     </div>
                 ) : (
                     doctors.map((doc) => (
@@ -102,8 +109,9 @@ function Doctors() {
                             </div>
 
                             <div className="space-y-2 text-sm text-gray-600">
-                                <p className="flex items-center gap-2">
-                                    <span aria-hidden="true">📧</span> {doc.email}
+                                <p className="flex items-center gap-2 overflow-hidden">
+                                    <span aria-hidden="true">📧</span>
+                                    <span className="truncate break-all" title={doc.email}>{doc.email}</span>
                                 </p>
                                 <p className="flex items-center gap-2">
                                     <span aria-hidden="true">📞</span> {doc.contact || 'No contact provided'}
@@ -117,13 +125,15 @@ function Doctors() {
                                 <span className={`px-2 py-1 rounded text-[10px] font-black tracking-wider ${doc.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                     {doc.is_active ? 'ACTIVE' : 'INACTIVE'}
                                 </span>
-                                <Link
-                                    to={`/doctors/edit/${doc.id}`}
-                                    className="text-blue-600 hover:text-blue-800 text-sm font-bold transition"
-                                    aria-label={`Edit profile for ${doc.name}`}
-                                >
-                                    Edit Profile
-                                </Link>
+                                {localStorage.getItem('role') === 'admin' && (
+                                    <Link
+                                        to={`/admin/doctors/edit/${doc.id}`}
+                                        className="text-blue-600 hover:text-blue-800 text-sm font-bold transition"
+                                        aria-label={`Edit profile for ${doc.name}`}
+                                    >
+                                        Edit Profile
+                                    </Link>
+                                )}
                             </div>
                         </article>
                     ))

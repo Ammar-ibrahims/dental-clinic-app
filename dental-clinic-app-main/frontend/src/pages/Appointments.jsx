@@ -24,7 +24,10 @@ function Appointments() {
         const fetchAppointments = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_BASE_URL}/api/appointments`);
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/appointments`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!res.ok) throw new Error(`Server error: ${res.status}`);
                 const data = await res.json();
                 setAppointments(data);
@@ -41,7 +44,11 @@ function Appointments() {
     const handleDelete = async (id) => {
         if (!window.confirm('Permanently delete this appointment?')) return;
         try {
-            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, { method: 'DELETE' });
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (!res.ok) throw new Error('Failed to delete');
             setAppointments((prev) => prev.filter((a) => a.id !== id));
         } catch (err) {

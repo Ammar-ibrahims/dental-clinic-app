@@ -1,0 +1,66 @@
+{
+  "patients": [
+    {
+      "id": 12,
+      "mongo_id": null,
+      "name": "Muhammad Ammar Ibrahim",
+      "email": "ammar@gmail.com",
+      "phone": "0323-3232323",
+      "date_of_birth": "2005-01-08T19:00:00.000Z",
+      "gender": "Male",
+      "blood_group": "A-",
+      "address": "Lahore",
+      "medical_history": "Allergies",
+      "created_at": "2026-03-13T02:59:02.300Z",
+      "document_url": "https://dental-app-uploads-ammar.s3.eu-north-1.amazonaws.com/patients/1773395688300_patient_report.pdf",
+      "user_id": 5
+    }
+  ],
+  "appointments": [
+    {
+      "id": 16,
+      "patient_id": "12",
+      "dentist_id": 1,
+      "appointment_date": "2026-03-15T19:00:00.000Z",
+      "appointment_time": "15:00:00",
+      "treatment_type": "Scaling",
+      "status": "Pending",
+      "notes": "",
+      "timezone": "Asia/Karachi",
+      "google_event_id": null,
+      "created_at": "2026-03-16T04:57:31.318Z",
+      "updated_at": "2026-03-16T04:57:31.318Z",
+      "doctor_name": "Ali"
+    },
+    {
+      "id": 15,
+      "patient_id": "12",
+      "dentist_id": 1,
+      "appointment_date": "2024-03-15T19:00:00.000Z",
+      "appointment_time": "15:00:00",
+      "treatment_type": "General Checkup",
+      "status": "Pending",
+      "notes": null,
+      "timezone": "Asia/Karachi",
+      "google_event_id": null,
+      "created_at": "2026-03-16T04:05:56.817Z",
+      "updated_at": "2026-03-16T04:05:56.817Z",
+      "doctor_name": "Ali"
+    },
+    {
+      "id": 14,
+      "patient_id": "12",
+      "dentist_id": 1,
+      "appointment_date": "2024-03-15T19:00:00.000Z",
+      "appointment_time": "14:30:00",
+      "treatment_type": "General Checkup",
+      "status": "Cancelled",
+      "notes": null,
+      "timezone": "Asia/Karachi",
+      "google_event_id": null,
+      "created_at": "2026-03-16T04:03:05.688Z",
+      "updated_at": "2026-03-16T04:03:05.688Z",
+      "doctor_name": "Ali"
+    }
+  ]
+}

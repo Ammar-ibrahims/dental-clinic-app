@@ -1,6 +1,5 @@
 import pool from '../config/db.js';
-import PatientMongo from '../models/Patient.js';
-import mongoose from 'mongoose';
+import * as upstash from '../services/upstashService.js';
 
 export const getStats = async (req, res) => {
     try {
@@ -9,13 +8,19 @@ export const getStats = async (req, res) => {
         res.set('Pragma', 'no-cache');
         res.set('Expires', '0');
 
-        console.log("--- FETCHING FRESH STATS ---");
+        console.log("--- FETCHING STATS (Checking Cache) ---");
+
+        const cacheKey = 'global_stats';
+        const cachedStats = await upstash.getCache(cacheKey);
+        if (cachedStats) {
+            console.log("✅ Serving stats from Upstash cache");
+            return res.json(cachedStats);
+        }
 
         const [patientResult, dentistResult, totalApptResult, todayApptResult] = await Promise.all([
             pool.query('SELECT COUNT(*) FROM patients'),
-            pool.query('SELECT COUNT(*) FROM dentists WHERE is_active = true'),
+            pool.query('SELECT COUNT(*) FROM doctors WHERE is_active = true'),
             pool.query("SELECT COUNT(*) FROM appointments WHERE status != 'Cancelled'"),
-            // Using a simpler string-based date comparison to be safe
             pool.query(`
                 SELECT COUNT(*) FROM appointments 
                 WHERE TO_CHAR(appointment_date AT TIME ZONE 'Asia/Karachi', 'YYYY-MM-DD') = 
@@ -30,6 +35,9 @@ export const getStats = async (req, res) => {
             total_appointments: parseInt(totalApptResult.rows[0].count) || 0,
             todays_appointments: parseInt(todayApptResult.rows[0].count) || 0,
         };
+
+        // Cache for 10 minutes
+        await upstash.setCache(cacheKey, stats, 600);
 
         console.log("FINAL STATS SENT TO FRONTEND:", stats);
         res.json(stats);

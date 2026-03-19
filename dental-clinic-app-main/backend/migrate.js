@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import pool from './src/config/db.js';
 
 const schema = `
@@ -28,6 +29,7 @@ CREATE TABLE patients (
     blood_group VARCHAR(5),
     address TEXT,
     medical_history TEXT,
+    document_url TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

@@ -1,93 +1,93 @@
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+
+// Layouts
+import PatientLayout from './layouts/PatientLayout';
+import AdminLayout from './layouts/AdminLayout';
+
+// Shared / Public
+import LandingPage from './pages/LandingPage';
+import PatientLogin from './pages/PatientLogin';
+import AdminLogin from './pages/AdminLogin';
+import PatientRegister from './pages/PatientRegister';
+import ProtectedRoute from './components/ProtectedRoute';
+
+// Admin Pages
 import Dashboard from './pages/Dashboard';
-import Doctors from './pages/Doctors';
-import AddDoctor from './pages/AddDoctor';
-import EditDoctor from './pages/EditDoctor';
 import Patients from './pages/Patients';
 import AddPatient from './pages/AddPatient';
 import EditPatient from './pages/EditPatient';
-import Appointments from './pages/Appointments';
-import BookAppointment from './pages/BookAppointment';
-import EditAppointment from './pages/EditAppointment';
+import Doctors from './pages/Doctors';
+import AddDoctor from './pages/AddDoctor';
+import EditDoctor from './pages/EditDoctor';
 import AdminAppointments from './pages/AdminAppointments';
+import EditAppointment from './pages/EditAppointment';
+import Reports from './pages/Reports';
+import AIAnalysis from './pages/AIAnalysis';
+
+// Patient Pages
+import PatientDashboard from './pages/PatientDashboard';
+import PatientAppointments from './pages/PatientAppointments';
+import PatientProfile from './pages/PatientProfile';
+import BookAppointment from './pages/BookAppointment';
+import PatientAI from './pages/PatientAI';
 
 function App() {
   return (
     <Router>
-      {/* Task 1: Skip Link for Keyboard Users */}
-      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:p-4 focus:bg-blue-600 focus:text-white">
-        Skip to main content
-      </a>
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/patient/login" element={<PatientLogin />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/patient/register" element={<PatientRegister />} />
 
-      <div className="min-h-screen bg-gray-50">
-        {/* --- RESPONSIVE HEADER --- */}
-        <header role="banner" className="bg-white border-b sticky top-0 z-10 shadow-sm">
-          {/* 
-              Changed 'flex' to 'flex-col' (mobile) and 'md:flex-row' (desktop).
-              Added 'gap-4' for spacing when stacked.
-          */}
-          <nav className="max-w-7xl mx-auto p-4 flex flex-col md:flex-row justify-between items-center gap-4" aria-label="Main Navigation">
+        {/* Patient Portal */}
+        <Route
+          path="/patient"
+          element={
+            <ProtectedRoute allowedRoles={['patient']}>
+              <PatientLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<PatientDashboard />} />
+          <Route path="appointments" element={<PatientAppointments />} />
+          <Route path="appointments/new" element={<BookAppointment />} />
+          <Route path="appointments/edit/:id" element={<BookAppointment isEdit={true} />} />
+          <Route path="doctors" element={<Doctors />} />
+          <Route path="profile" element={<PatientProfile />} />
+          <Route path="ai-assistant" element={<PatientAI />} />
+          <Route path="profile/edit/:id" element={<EditPatient isPatientPortal={true} />} />
+        </Route>
 
-            <h1 className="text-xl font-black text-blue-600 tracking-tight">
-              <Link to="/" aria-label="Dental App Home">🦷 DENTAL APP</Link>
-            </h1>
+        {/* Admin Portal */}
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute allowedRoles={['admin']}>
+              <AdminLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="patients" element={<Patients />} />
+          <Route path="patients/new" element={<AddPatient />} />
+          <Route path="patients/edit/:id" element={<EditPatient />} />
+          <Route path="doctors" element={<Doctors />} />
+          <Route path="doctors/new" element={<AddDoctor />} />
+          <Route path="doctors/edit/:id" element={<EditDoctor />} />
+          <Route path="appointments" element={<AdminAppointments />} />
+          <Route path="appointments/edit/:id" element={<EditAppointment />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="ai-analysis" element={<AIAnalysis />} />
+          <Route path="settings" element={<div>Settings (Coming Soon)</div>} />
+        </Route>
 
-            {/* 
-                Changed 'space-x-6' to 'flex-wrap' and 'justify-center'.
-                This ensures links don't go off-screen on small phones.
-                Added 'text-sm' for mobile and 'md:text-base' for desktop.
-            */}
-            <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 md:gap-x-6 font-bold text-gray-600 list-none text-sm md:text-base">
-              <li>
-                <Link to="/" className="hover:text-blue-600 transition focus:ring-2 focus:ring-blue-500 focus:outline-none rounded-md px-2 py-1">
-                  Dashboard
-                </Link>
-              </li>
-              <li>
-                <Link to="/patients" className="hover:text-blue-600 transition focus:ring-2 focus:ring-blue-500 focus:outline-none rounded-md px-2 py-1">
-                  Patients
-                </Link>
-              </li>
-              <li>
-                <Link to="/doctors" className="hover:text-blue-600 transition focus:ring-2 focus:ring-blue-500 focus:outline-none rounded-md px-2 py-1">
-                  Doctors
-                </Link>
-              </li>
-              <li>
-                <Link to="/appointments" className="hover:text-blue-600 transition focus:ring-2 focus:ring-blue-500 focus:outline-none rounded-md px-2 py-1">
-                  Appointments
-                </Link>
-              </li>
-              <li>
-                <Link to="/admin/appointments" className="hover:text-purple-600 text-purple-500 transition focus:ring-2 focus:ring-purple-500 focus:outline-none rounded-md px-2 py-1">
-                  Admin
-                </Link>
-              </li>
-            </ul>
-          </nav>
-        </header>
-
-        {/* --- RESPONSIVE MAIN CONTENT --- */}
-        <main id="main-content" role="main" className="focus:outline-none px-4 sm:px-0">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/patients/new" element={<AddPatient />} />
-            <Route path="/patients/edit/:id" element={<EditPatient />} />
-            <Route path="/doctors" element={<Doctors />} />
-            <Route path="/doctors/new" element={<AddDoctor />} />
-            <Route path="/doctors/edit/:id" element={<EditDoctor />} />
-            <Route path="/appointments" element={<Appointments />} />
-            <Route path="/appointments/new" element={<BookAppointment />} />
-            <Route path="/appointments/edit/:id" element={<EditAppointment />} />
-            <Route path="/admin/appointments" element={<AdminAppointments />} />
-          </Routes>
-        </main>
-
-        <footer className="p-8 text-center text-gray-400 text-sm" role="contentinfo">
-          &copy; {new Date().getFullYear()} Dental Clinic Management System. All rights reserved.
-        </footer>
-      </div>
+        {/* Redirects */}
+        <Route path="/appointments" element={<Navigate to="/patient/appointments" replace />} />
+        <Route path="/patients" element={<Navigate to="/admin/patients" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Router>
   );
 }

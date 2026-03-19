@@ -27,13 +27,16 @@ function EditAppointment() {
     const [status, setStatus] = useState('');
     const [appointment, setAppointment] = useState(null);
 
-    const API_BASE_URL = 'http://16.170.201.132:8000/api';
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
     useEffect(() => {
         const fetchAppointment = async () => {
             try {
                 setLoading(true);
-                const res = await fetch(`${API_BASE_URL}/appointments/${id}`);
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/appointments/${id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!res.ok) {
                     if (res.status === 404) throw new Error('Appointment not found');
                     throw new Error('Server error: ' + res.status);
@@ -57,16 +60,20 @@ function EditAppointment() {
         setSubmitting(true);
 
         try {
-            const res = await fetch(`${API_BASE_URL}/appointments/${id}/status`, {
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/appointments/${id}/status`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ status })
             });
 
             if (!res.ok) throw new Error('Update failed');
 
             setSuccess('✅ Appointment status updated successfully!');
-            setTimeout(() => navigate('/appointments'), 1500);
+            setTimeout(() => navigate('/admin/appointments'), 1500);
         } catch (err) {
             setError('❌ ' + err.message);
         } finally {
@@ -84,7 +91,7 @@ function EditAppointment() {
             ) : !appointment ? (
                 <div className="p-8 text-center bg-white rounded-2xl shadow-sm border">
                     <p className="text-red-500 font-bold mb-4">{error || "Appointment not found."}</p>
-                    <button onClick={() => navigate('/appointments')} className="text-blue-600 font-bold underline">Back to list</button>
+                    <button onClick={() => navigate('/admin/appointments')} className="text-blue-600 font-bold underline">Back to list</button>
                 </div>
             ) : (
                 /* Responsive Form Padding: p-4 on mobile, p-8 on desktop */
@@ -130,7 +137,7 @@ function EditAppointment() {
                     <div className="pt-4 flex flex-col sm:flex-row gap-3">
                         <button
                             type="button"
-                            onClick={() => navigate('/appointments')}
+                            onClick={() => navigate('/admin/appointments')}
                             className="w-full sm:flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-200 transition"
                         >
                             Cancel

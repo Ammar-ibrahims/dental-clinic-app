@@ -22,13 +22,15 @@ function Patients() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
-    const API_BASE_URL = 'http://16.170.201.132:8000/api';
+    const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
     const fetchPatients = async () => {
         setLoading(true);
         try {
-            const res = await fetch(`${API_BASE_URL}/patients`);
-            if (!res.ok) throw new Error(`Failed to load patients`);
+            const token = localStorage.getItem('token');
+            const res = await fetch(`${API_BASE_URL}/api/patients`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const data = await res.json();
             setPatients(Array.isArray(data) ? data : data.patients || []);
         } catch (err) {
@@ -45,8 +47,10 @@ function Patients() {
     const handleDelete = async (id) => {
         if (window.confirm("Are you sure? This will delete all records for this patient.")) {
             try {
-                const res = await fetch(`${API_BASE_URL}/patients/${id}`, {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/patients/${id}`, {
                     method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (res.ok) {
@@ -69,7 +73,7 @@ function Patients() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Patients</h1>
                 <Link
-                    to="/patients/new"
+                    to="/admin/patients/new"
                     className="w-full sm:w-auto text-center bg-blue-600 text-white px-6 py-3 sm:py-2 rounded-lg font-bold hover:bg-blue-700 transition shadow-md focus:ring-4 focus:ring-blue-300 outline-none"
                     aria-label="Add a new patient"
                 >
@@ -138,7 +142,7 @@ function Patients() {
                                             <td className="p-4 text-center">
                                                 <div className="flex justify-center gap-4">
                                                     <Link
-                                                        to={`/patients/edit/${p.id}`}
+                                                        to={`/admin/patients/edit/${p.id}`}
                                                         className="text-blue-600 font-bold hover:underline focus:outline-blue-500"
                                                         aria-label={`Edit ${p.name}`}
                                                     >

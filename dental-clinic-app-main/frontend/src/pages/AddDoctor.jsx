@@ -24,6 +24,14 @@ function AddDoctor() {
         setForm({ ...form, [name]: type === 'checkbox' ? checked : value });
     };
 
+    const handleContactChange = (e) => {
+        let digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+        if (digits.length > 4) {
+            digits = digits.slice(0, 4) + '-' + digits.slice(4);
+        }
+        setForm({ ...form, contact: digits });
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
@@ -34,6 +42,12 @@ function AddDoctor() {
             return;
         }
 
+        const digitsOnly = form.contact.replace(/[^0-9]/g, '');
+        if (form.contact && digitsOnly.length !== 11) {
+            setError('Contact number must be exactly 11 digits (e.g. 0300-1234567).');
+            return;
+        }
+
         setSubmitting(true);
         try {
             const payload = {
@@ -41,9 +55,13 @@ function AddDoctor() {
                 years_experience: form.years_experience ? parseInt(form.years_experience) : 0,
             };
 
+            const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/doctors`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify(payload),
             });
 
@@ -61,7 +79,7 @@ function AddDoctor() {
                 if (form.connect_google_calendar && data.id) {
                     window.location.href = `${API_BASE_URL}/api/auth/google?dentist_id=${data.id}&email=${form.email}`;
                 } else {
-                    navigate('/doctors');
+                    navigate('/admin/doctors');
                 }
             }, 1200);
         } catch (err) {
@@ -112,7 +130,7 @@ function AddDoctor() {
                     </div>
                     <div>
                         <label htmlFor="doc-phone" className="block text-sm font-semibold text-gray-700 mb-1">Contact Number</label>
-                        <input id="doc-phone" type="text" name="contact" value={form.contact} onChange={handleChange} placeholder="0300-1234567"
+                        <input id="doc-phone" type="text" name="contact" value={form.contact} onChange={handleContactChange} placeholder="0300-1234567" maxLength={12}
                             className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
                     </div>
                 </div>
@@ -144,7 +162,7 @@ function AddDoctor() {
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                    <button type="button" onClick={() => navigate('/doctors')}
+                    <button type="button" onClick={() => navigate('/admin/doctors')}
                         className="w-full sm:w-1/3 bg-gray-100 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-200 transition">
                         Cancel
                     </button>

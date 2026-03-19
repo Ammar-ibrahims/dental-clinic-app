@@ -2,35 +2,43 @@ import * as PatientSQL from '../models/patientModel.js';
 import PatientMongo from '../models/Patient.js';
 import mongoose from 'mongoose';
 import { getPresignedUrl } from '../services/uploadService.js';
-import pool from '../config/db.js'; // <--- ADD THIS LINE
+import pool from '../config/db.js';
+import * as upstash from '../services/upstashService.js';
 
 const isMongoId = (id) => /^[0-9a-fA-F]{24}$/.test(id);
+const PATIENTS_CACHE_KEY = 'all_patients';
 
 /**
  * @desc    GET all patients (Fixed: No more duplicates)
  */
 export const getAll = async (req, res) => {
     try {
-        console.log("📡 API Call: Fetching patients from PostgreSQL...");
+        console.log("📡 API Call: Fetching patients (checking cache)...");
 
-        // 1. Fetch only from PostgreSQL (The Master List)
+        const cached = await upstash.getCache(PATIENTS_CACHE_KEY);
+        if (cached) {
+            console.log('✅ Serving patients from Upstash cache');
+            return res.json(cached);
+        }
+
         const sqlResult = await PatientSQL.getAllPatients();
 
         if (!sqlResult || !sqlResult.rows) {
             return res.json([]);
         }
 
-        // 2. Generate secure S3 links for the list
         const patients = await Promise.all(sqlResult.rows.map(async (p) => ({
             id: p.id,
             mongo_id: p.mongo_id,
             name: p.name,
             email: p.email,
             phone: p.phone,
-            // Use the document_url from Postgres and sign it
             document_url: p.document_url ? await getPresignedUrl(p.document_url) : "",
             source: 'postgresql'
         })));
+
+        // Cache for 30 minutes
+        await upstash.setCache(PATIENTS_CACHE_KEY, patients, 1800);
 
         console.log(`✅ Sent ${patients.length} unique patients to frontend`);
         res.json(patients);
@@ -72,6 +80,9 @@ export const create = async (req, res) => {
             });
         } catch (sqlErr) { console.error("❌ SQL Save Error:", sqlErr.message); }
 
+        // Invalidate patient list cache
+        await upstash.delCache(PATIENTS_CACHE_KEY);
+
         res.status(201).json(savedMongo);
     } catch (err) { res.status(400).json({ error: err.message }); }
 };
@@ -82,11 +93,23 @@ export const update = async (req, res) => {
         const documentUrl = req.file ? req.file.location : null;
         if (isMongoId(id)) {
             const updateData = { ...req.body };
-            if (documentUrl) updateData.documentUrl = documentUrl;
+            if (documentUrl) {
+                updateData.documentUrl = documentUrl;
+            } else if (req.body.delete_current_file === 'true') {
+                updateData.documentUrl = "";
+            }
             const updated = await PatientMongo.findByIdAndUpdate(id, updateData, { new: true });
             res.json(updated);
         } else {
-            const result = await PatientSQL.updatePatient(id, { ...req.body, document_url: documentUrl });
+            let finalDocUrl = documentUrl;
+            if (!finalDocUrl && req.body.delete_current_file === 'true') {
+                finalDocUrl = "";
+            }
+
+            const result = await PatientSQL.updatePatient(id, {
+                ...req.body,
+                document_url: finalDocUrl === null ? undefined : finalDocUrl
+            });
             res.json(result.rows[0]);
         }
     } catch (err) { res.status(400).json({ error: err.message }); }
@@ -95,11 +118,47 @@ export const update = async (req, res) => {
 export const remove = async (req, res) => {
     try {
         const { id } = req.params;
+        let postgresId = null;
+        let mongoId = null;
+        let targetEmail = null;
+
         if (isMongoId(id)) {
-            await PatientMongo.findByIdAndDelete(id);
+            mongoId = id;
+            try {
+                const mongoPatient = await PatientMongo.findById(mongoId);
+                if (mongoPatient) targetEmail = mongoPatient.email;
+            } catch (err) {}
+            
+            if (targetEmail) {
+                const result = await PatientSQL.getAllPatients();
+                const p = result.rows.find(row => row.email === targetEmail);
+                if (p) postgresId = p.id;
+            }
         } else {
-            await PatientSQL.deletePatient(id);
+            postgresId = id;
+            try {
+                const pRes = await PatientSQL.getPatientById(id);
+                if (pRes.rows.length > 0) targetEmail = pRes.rows[0].email;
+            } catch (err) {}
+            
+            if (targetEmail) {
+                 const mongoPatient = await PatientMongo.findOne({ email: targetEmail });
+                 if (mongoPatient) mongoId = mongoPatient._id;
+            }
         }
+
+        // 1. Delete from MongoDB
+        try {
+           if (mongoId) await PatientMongo.findByIdAndDelete(mongoId);
+        } catch (err) { console.error("MongoDB delete error:", err.message) }
+
+        // 2. Delete from PostgreSQL
+        try {
+            if (postgresId) await PatientSQL.deletePatient(postgresId);
+        } catch (err) { console.error("PostgreSQL delete error:", err.message) }
+
+        // Invalidate patient list cache
+        await upstash.delCache(PATIENTS_CACHE_KEY);
         res.json({ message: 'Deleted successfully' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 };
@@ -125,7 +184,12 @@ export const getMyProfile = async (req, res) => {
             return res.status(404).json({ error: "Patient profile not found" });
         }
 
-        res.json(result.rows[0]);
+        const p = result.rows[0];
+        if (p.document_url) {
+            p.document_url = await getPresignedUrl(p.document_url);
+        }
+
+        res.json(p);
     } catch (err) {
         console.error("Error in getMyProfile:", err); // Added logging to help debug future issues
         res.status(500).json({ error: err.message });

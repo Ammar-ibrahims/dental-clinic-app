@@ -18,7 +18,10 @@ function Dashboard() {
     useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${API_BASE_URL}/api/stats`);
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_BASE_URL}/api/stats`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
                 if (!res.ok) throw new Error(`Failed to load stats (Status: ${res.status})`);
                 const data = await res.json();
                 setStats(data);

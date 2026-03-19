@@ -7,15 +7,16 @@ export const getAllAppointments = () =>
       d.name  AS dentist_name,
       d.specialty
     FROM appointments a
-    JOIN dentists d ON a.dentist_id = d.id
+    JOIN doctors d ON a.dentist_id = d.id
     ORDER BY a.appointment_date DESC, a.appointment_time DESC
   `);
 
 export const getAppointmentById = (id) =>
     pool.query(
-        `SELECT a.*, d.name AS dentist_name
+        `SELECT a.*, d.name AS dentist_name, p.email, p.name AS patient_name
      FROM appointments a
-     JOIN dentists d ON a.dentist_id = d.id
+     JOIN doctors d ON a.dentist_id = d.id
+     LEFT JOIN patients p ON a.patient_id = CAST(p.id AS VARCHAR)
      WHERE a.id = $1`,
         [id]
     );
@@ -58,6 +59,14 @@ export const createAppointment = ({ patient_id, dentist_id, appointment_date, ap
 
 export const updateGoogleEventId = (id, eventId) =>
     pool.query('UPDATE appointments SET google_event_id=$1 WHERE id=$2 RETURNING *', [eventId, id]);
+
+export const updateAppointment = (id, { dentist_id, appointment_date, appointment_time, treatment_type, notes }) =>
+    pool.query(
+        `UPDATE appointments 
+         SET dentist_id = $1, appointment_date = $2, appointment_time = $3, treatment_type = $4, notes = $5 
+         WHERE id = $6 RETURNING *`,
+        [dentist_id, appointment_date, appointment_time, treatment_type, notes, id]
+    );
 
 export const updateAppointmentStatus = (id, status) =>
     pool.query('UPDATE appointments SET status=$1 WHERE id=$2 RETURNING *', [status, id]);

@@ -6,7 +6,8 @@ function AddPatient() {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [selectedFile, setSelectedFile] = useState(null);
+    const [selectedFiles, setSelectedFiles] = useState(null);
+    const [fileWarning, setFileWarning] = useState('');
 
     const API_BASE_URL = import.meta.env.VITE_API_URL || '';
     const today = new Date().toISOString().split('T')[0];
@@ -25,26 +26,38 @@ function AddPatient() {
     const handleChange = (e) => {
         const { name, value } = e.target;
         if (name === 'phone') {
-            let nums = value.replace(/[^0-9]/g, '');
-            if (nums.length > 11) nums = nums.substring(0, 11);
-            let formatted = nums;
-            if (nums.length > 4) {
-                formatted = nums.substring(0, 4) + '-' + nums.substring(4);
+            const digits = value.replace(/\D/g, '');
+            const limited = digits.slice(0, 11);
+            let formatted = limited;
+            if (limited.length > 4) {
+                formatted = `${limited.slice(0, 4)}-${limited.slice(4)}`;
             }
-            setForm({ ...form, [name]: formatted });
+            setForm({ ...form, phone: formatted });
         } else {
             setForm({ ...form, [name]: value });
         }
     };
 
     const handleFileChange = (e) => {
-        setSelectedFile(e.target.files[0]);
+        const files = Array.from(e.target.files);
+        setSelectedFiles(e.target.files);
+        setFileWarning('');
+
+        const pdfCount = files.filter(f => f.type === 'application/pdf').length;
+        if (pdfCount > 1) {
+            setFileWarning('⚠️ You have selected multiple PDF files. Please upload them as a single compressed ZIP folder instead.');
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setSuccess('');
+
+        if (fileWarning) {
+            setError('Please resolve the file upload warning before saving.');
+            return;
+        }
 
         if (!form.name || !form.email || !form.phone) {
             setError('Name, email, and phone are required.');
@@ -56,19 +69,30 @@ function AddPatient() {
             return;
         }
 
-        if (form.date_of_birth && form.date_of_birth > today) {
-            setError('❌ Date of Birth cannot be in the future.');
-            return;
+        if (form.date_of_birth) {
+            const selectedDate = new Date(form.date_of_birth);
+            const todayDate = new Date();
+            todayDate.setHours(0, 0, 0, 0);
+            if (selectedDate > todayDate) {
+                setError('❌ Date of Birth cannot be in the future.');
+                return;
+            }
         }
 
         setSubmitting(true);
         const formData = new FormData();
         Object.keys(form).forEach(key => formData.append(key, form[key]));
-        if (selectedFile) formData.append('patient_file', selectedFile);
+        if (selectedFiles) {
+            for (let i = 0; i < selectedFiles.length; i++) {
+                formData.append('patient_file', selectedFiles[i]);
+            }
+        }
 
         try {
+            const token = localStorage.getItem('token');
             const res = await fetch(`${API_BASE_URL}/api/patients`, {
                 method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
                 body: formData,
             });
 
@@ -81,7 +105,7 @@ function AddPatient() {
             if (!res.ok) throw new Error(data.error || 'Failed to create patient');
 
             setSuccess('✅ Patient created successfully!');
-            setTimeout(() => navigate('/patients'), 1200);
+            setTimeout(() => navigate('/admin/patients'), 1200);
         } catch (err) {
             console.error("Submit Error:", err);
             setError('❌ ' + err.message);
@@ -165,16 +189,41 @@ function AddPatient() {
                         placeholder="Allergies, chronic diseases, past surgeries..." />
                 </div>
 
-                <div>
-                    <label htmlFor="patient_file" className="block text-sm font-semibold text-gray-700 mb-1">Attach Medical Document (X-Ray/Report)</label>
-                    <input id="patient_file" type="file" onChange={handleFileChange}
-                        className="w-full p-2 border rounded bg-gray-50 text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+                    <label htmlFor="patient_file" className="block text-sm font-semibold text-gray-700 mb-2">Medical Documents (PDF/ZIP)</label>
+                    <input
+                        id="patient_file"
+                        type="file"
+                        onChange={handleFileChange}
+                        accept=".pdf,.zip"
+                        multiple
+                        className="text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 w-full"
                     />
+
+                    {/* Selected Files List */}
+                    {selectedFiles && selectedFiles.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                            <p className="text-[11px] font-bold text-blue-800 uppercase tracking-wider">Selected Files:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {Array.from(selectedFiles).map((file, idx) => (
+                                    <div key={idx} className="bg-white border border-blue-200 px-3 py-1 rounded-full text-[12px] text-blue-700 flex items-center shadow-sm">
+                                        <span className="truncate max-w-[150px]">{file.name}</span>
+                                        <span className="ml-2 text-[10px] opacity-60">({(file.size / 1024).toFixed(0)} KB)</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {fileWarning && <p className="mt-2 text-xs text-orange-600 font-bold">{fileWarning}</p>}
+                    <p className="mt-2 text-[10px] text-gray-400 italic font-medium">
+                        Max 1 ZIP or multiple PDFs (ZIP preferred for multiple documents)
+                    </p>
                 </div>
 
                 {/* Responsive Buttons: Stacked on mobile, side-by-side on desktop */}
                 <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                    <button type="button" onClick={() => navigate('/patients')}
+                    <button type="button" onClick={() => navigate('/admin/patients')}
                         className="w-full sm:flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg font-bold hover:bg-gray-200 transition">
                         Cancel
                     </button>

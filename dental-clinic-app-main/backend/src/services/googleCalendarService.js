@@ -79,6 +79,23 @@ export const deleteEvent = async (tokens, eventId) => {
     }
 };
 
+export const updateEvent = async (tokens, eventId, eventDetails) => {
+    try {
+        oauth2Client.setCredentials(tokens);
+        const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+        const res = await calendar.events.patch({
+            calendarId: 'primary',
+            eventId: eventId,
+            requestBody: eventDetails,
+        });
+        return res.data;
+    } catch (error) {
+        console.error('Error updating Google Calendar event:', error.response?.data || error);
+        throw error;
+    }
+};
+
 export const getBusyPeriods = async (tokens, timeMin, timeMax, timeZone = 'UTC') => {
     try {
         oauth2Client.setCredentials(tokens);
