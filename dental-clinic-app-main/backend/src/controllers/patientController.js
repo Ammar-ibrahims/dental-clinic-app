@@ -33,6 +33,7 @@ export const getAll = async (req, res) => {
             name: p.name,
             email: p.email,
             phone: p.phone,
+            age: p.age,
             document_url: p.document_url ? await getPresignedUrl(p.document_url) : "",
             source: 'postgresql'
         })));
@@ -68,13 +69,16 @@ export const getById = async (req, res) => {
 
 export const create = async (req, res) => {
     try {
+        const { age, ...rest } = req.body;
         const documentUrl = req.file ? req.file.location : "";
-        const newPatient = new PatientMongo({ ...req.body, documentUrl });
+        const parsedAge = (age !== undefined && age !== '') ? parseInt(age) : null;
+        const newPatient = new PatientMongo({ ...rest, age: parsedAge, documentUrl });
         const savedMongo = await newPatient.save();
 
         try {
             await PatientSQL.createPatient({
-                ...req.body,
+                ...rest,
+                age: parsedAge,
                 mongo_id: savedMongo._id.toString(),
                 document_url: documentUrl
             });
@@ -90,9 +94,12 @@ export const create = async (req, res) => {
 export const update = async (req, res) => {
     try {
         const { id } = req.params;
+        const { age, ...rest } = req.body;
         const documentUrl = req.file ? req.file.location : null;
+        const parsedAge = (age !== undefined && age !== '' && age !== null) ? parseInt(age) : null;
         if (isMongoId(id)) {
-            const updateData = { ...req.body };
+            const updateData = { ...rest };
+            updateData.age = parsedAge;
             if (documentUrl) {
                 updateData.documentUrl = documentUrl;
             } else if (req.body.delete_current_file === 'true') {
@@ -101,18 +108,40 @@ export const update = async (req, res) => {
             const updated = await PatientMongo.findByIdAndUpdate(id, updateData, { new: true });
             res.json(updated);
         } else {
+            console.log(`📝 Updating SQL Patient ID: ${id}`);
+            // Fetch existing to preserve document_url if not changing
+            const existingRes = await PatientSQL.getPatientById(id);
+            if (existingRes.rows.length === 0) {
+                console.error(`❌ SQL Patient ID ${id} not found`);
+                return res.status(404).json({ error: 'Patient record not found in SQL database' });
+            }
+            const p = existingRes.rows[0];
+
             let finalDocUrl = documentUrl;
-            if (!finalDocUrl && req.body.delete_current_file === 'true') {
-                finalDocUrl = "";
+            if (finalDocUrl === null) {
+                if (req.body.delete_current_file === 'true') {
+                    finalDocUrl = "";
+                } else {
+                    finalDocUrl = p.document_url; // Preserve existing
+                }
             }
 
             const result = await PatientSQL.updatePatient(id, {
-                ...req.body,
-                document_url: finalDocUrl === null ? undefined : finalDocUrl
+                ...rest,
+                age: parsedAge,
+                document_url: finalDocUrl
             });
+            
+            if (result.rows.length === 0) {
+                throw new Error("Update failed: No rows returned from SQL update");
+            }
+            console.log(`✅ SQL Patient ID ${id} updated successfully`);
             res.json(result.rows[0]);
         }
-    } catch (err) { res.status(400).json({ error: err.message }); }
+    } catch (err) { 
+        console.error("❌ Patient Update Error:", err);
+        res.status(400).json({ error: err.message }); 
+    }
 };
 
 export const remove = async (req, res) => {

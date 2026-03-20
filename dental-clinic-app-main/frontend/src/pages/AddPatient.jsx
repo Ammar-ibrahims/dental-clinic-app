@@ -21,6 +21,7 @@ function AddPatient() {
         gender: '',
         blood_group: '',
         medical_history: '',
+        age: '',
     });
 
     const handleChange = (e) => {
@@ -146,11 +147,16 @@ function AddPatient() {
                     </div>
                 </div>
 
-                {/* Responsive Grid: 1 column on mobile, 2 columns on small screens and up */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Responsive Grid: 3 columns on small screens and up for DOB, Age, Gender */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                         <label htmlFor="dob" className="block text-sm font-semibold text-gray-700 mb-1">Date of Birth</label>
                         <input id="dob" type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleChange} max={today}
+                            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                    </div>
+                    <div>
+                        <label htmlFor="age" className="block text-sm font-semibold text-gray-700 mb-1">Age</label>
+                        <input id="age" type="number" name="age" value={form.age} onChange={handleChange} min="0" max="120"
                             className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400" />
                     </div>
                     <div>

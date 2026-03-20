@@ -38,6 +38,29 @@ async function getStatusBreakdown() {
     return { status_breakdown: result.rows };
 }
 
+async function getAgeDistribution() {
+    const result = await pool.query(`
+        SELECT 
+            CASE 
+                WHEN age < 18 THEN '0-18'
+                WHEN age >= 18 AND age <= 30 THEN '19-30'
+                WHEN age >= 31 AND age <= 45 THEN '31-45'
+                WHEN age >= 46 AND age <= 60 THEN '46-60'
+                ELSE '61+'
+            END as age_group,
+            COUNT(*) as count
+        FROM patients
+        GROUP BY age_group
+        ORDER BY age_group
+    `);
+    const order = ['0-18', '19-30', '31-45', '46-60', '61+'];
+    const sorted = order.map(group => {
+        const found = result.rows.find(r => r.age_group === group);
+        return { age_group: group, count: found ? parseInt(found.count) : 0 };
+    });
+    return { age_distribution: sorted };
+}
+
 async function dispatchTool(name) {
     switch (name) {
         case 'getWeeklyAppointments': return await getWeeklyAppointments();
@@ -46,6 +69,7 @@ async function dispatchTool(name) {
         case 'getMissedAppointments': return await getMissedAppointments();
         case 'getAppointmentsPerDay': return await getAppointmentsPerDay();
         case 'getStatusBreakdown': return await getStatusBreakdown();
+        case 'getAgeDistribution': return await getAgeDistribution();
         case 'getAllPatients': return await getAllPatients();
         default: return { error: 'Unknown function' };
     }
@@ -116,15 +140,17 @@ export const getUsage = async (req, res) => {
 
 export const getChartData = async (req, res) => {
     try {
-        const [perDay, workload, status] = await Promise.all([
+        const [perDay, workload, status, ageDist] = await Promise.all([
             getAppointmentsPerDay(),
             getDoctorWorkload(),
-            getStatusBreakdown()
+            getStatusBreakdown(),
+            getAgeDistribution()
         ]);
         res.json({
             appointmentsPerDay: perDay.appointments_per_day,
             doctorWorkload: workload.doctor_workload,
-            statusBreakdown: status.status_breakdown
+            statusBreakdown: status.status_breakdown,
+            ageDistribution: ageDist.age_distribution
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

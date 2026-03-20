@@ -78,25 +78,26 @@ export const syncAppointmentToGoogle = async (appointmentId) => {
             await AppointmentModel.updateGoogleEventId(appt.id, googleEvent.id);
             console.info(`✅ Synced appointment ${appt.id} to Google Calendar`);
 
+            // DEBUG: Check if appt.email is populated
+            console.log(`🔍 [DEBUG] Appointment ${appt.id} for sync - Patient Email: ${appt.email}`);
+
             // NEW: Send Appointment Confirmation Email via MailerLite
+            // We use the "Add to Group" method because it's more reliable for Free accounts
+            // and triggers a MailerLite Automation.
             if (appt.email) {
                 try {
-                    const readableDate = new Date(appt.appointment_date).toLocaleDateString('en-US', {
-                        weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                    });
-                    await mailerLiteService.sendAppointmentEmail(
-                        appt.email,
-                        patientName,
-                        `${readableDate} at ${appt.appointment_time}`
-                    );
-                } catch (emailErr) {
-                    console.error("⚠️ Failed to send confirmation email:", emailErr.message);
+                    console.log(`📡 [SYNC] Triggering MailerLite group sync for ${appt.email}...`);
+                    await mailerLiteService.addSubscriberToGroup(appt.email, patientName);
+                    console.log(`✅ [SYNC] MailerLite group sync completed for ${appt.email}.`);
+                } catch (mlErr) {
+                    console.error("⚠️ [SYNC] Failed to sync to MailerLite group:", mlErr.message);
                 }
             }
         }
     } catch (error) {
         console.error("❌ Google Calendar Sync Error:", error.message);
     }
+    console.log("🏁 [DEBUG] syncAppointmentToGoogle fully finished.");
 };
 
 export const deleteGoogleEvent = async (appointmentId) => {

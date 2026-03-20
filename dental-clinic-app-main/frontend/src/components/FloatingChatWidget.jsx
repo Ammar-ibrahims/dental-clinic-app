@@ -19,11 +19,12 @@ function FloatingChatWidget() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatHistory, loading]);
 
-    // Show tooltip after a short delay
+    // Show tooltip after a short delay, but only if not dismissed before
     useEffect(() => {
+        const isDismissed = localStorage.getItem('hide_ai_tooltip');
         const timer = setTimeout(() => {
-            if (!isOpen) setShowTooltip(true);
-        }, 2000);
+            if (!isOpen && !isDismissed) setShowTooltip(true);
+        }, 3000);
         return () => clearTimeout(timer);
     }, [isOpen]);
 
@@ -61,7 +62,7 @@ function FloatingChatWidget() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Request failed');
-            setChatHistory(prev => [...prev, { role: 'assistant', content: data.answer }]);
+            setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
         } catch (err) {
             setChatHistory(prev => [...prev, { role: 'assistant', content: `⚠️ ${err.message}` }]);
         } finally {
@@ -147,6 +148,16 @@ function FloatingChatWidget() {
                         <div ref={chatEndRef} />
                     </div>
 
+                    {/* Quick Dismiss for this session */}
+                    {!isOpen && showTooltip && (
+                        <div style={{ padding: '8px', textAlign: 'center', borderTop: '1px solid #f1f5f9' }}>
+                            <button 
+                                onClick={() => { setShowTooltip(false); localStorage.setItem('hide_ai_tooltip', 'true'); }}
+                                style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer' }}
+                            >Don't show this again</button>
+                        </div>
+                    )}
+
                     {/* Input */}
                     <div style={{
                         borderTop: '1px solid #e5e7eb', padding: '12px 14px',
@@ -204,7 +215,11 @@ function FloatingChatWidget() {
                     }} />
                     
                     <button 
-                        onClick={(e) => { e.stopPropagation(); setShowTooltip(false); }}
+                        onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setShowTooltip(false); 
+                            localStorage.setItem('hide_ai_tooltip', 'true');
+                        }}
                         style={{ 
                             marginLeft: '4px', color: '#94a3b8', border: 'none', 
                             background: 'none', cursor: 'pointer', fontSize: '16px',
@@ -251,11 +266,16 @@ function FloatingChatWidget() {
 
                 @media (max-width: 768px) {
                     .ai-bubble-btn {
-                        bottom: 140px !important; /* Lifted higher to clear the mobile nav comfortably */
+                        bottom: 85px !important; /* Adjusted to sit right above the mobile nav */
+                        right: 16px !important;
+                        width: 48px !important;
+                        height: 48px !important;
                     }
                     .ai-tooltip {
-                        bottom: 148px !important;
-                        right: 24px !important; /* Move to right edge on small screens for better readability */
+                        bottom: 140px !important;
+                        right: 16px !important;
+                        padding: 8px 14px !important;
+                        font-size: 12px !important;
                     }
                 }
             `}</style>

@@ -57,11 +57,29 @@ export const getReportData = async (req, res) => {
             WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
         `);
 
+        // 5. Age Distribution Histogram Data
+        const ageDistRes = await pool.query(`
+            SELECT 
+                CASE 
+                    WHEN age BETWEEN 0 AND 18 THEN '0-18'
+                    WHEN age BETWEEN 19 AND 30 THEN '19-30'
+                    WHEN age BETWEEN 31 AND 45 THEN '31-45'
+                    WHEN age BETWEEN 46 AND 60 THEN '46-60'
+                    ELSE '61+'
+                END as age_group,
+                COUNT(*) as count
+            FROM patients
+            WHERE age IS NOT NULL
+            GROUP BY age_group
+            ORDER BY MIN(age)
+        `);
+
         const finalData = {
             statusBreakdown: statusRes.rows,
             treatmentTrends: treatmentRes.rows,
             todaySummary: todayDetailsRes.rows,
-            newPatientsLast30Days: parseInt(growthRes.rows[0].count) || 0
+            newPatientsLast30Days: parseInt(growthRes.rows[0].count) || 0,
+            ageDistribution: ageDistRes.rows
         };
 
         // Cache for 5 minutes

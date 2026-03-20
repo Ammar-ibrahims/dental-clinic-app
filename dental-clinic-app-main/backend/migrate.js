@@ -25,6 +25,7 @@ CREATE TABLE patients (
     email VARCHAR(255) UNIQUE NOT NULL,
     phone VARCHAR(20),
     date_of_birth DATE,
+    age INTEGER,
     gender VARCHAR(10),
     blood_group VARCHAR(5),
     address TEXT,

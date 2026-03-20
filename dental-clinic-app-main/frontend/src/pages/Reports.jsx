@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
+} from 'recharts';
 
 const Card = ({ title, children, className = "" }) => (
     <div className={`bg-white p-6 rounded-2xl border border-gray-100 shadow-sm ${className}`}>
@@ -20,6 +23,8 @@ const Badge = ({ status }) => {
         </span>
     );
 };
+
+const CHART_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899'];
 
 function Reports() {
     const [data, setData] = useState(null);
@@ -52,19 +57,19 @@ function Reports() {
 
     return (
         <div className="p-4 sm:p-8 max-w-7xl mx-auto space-y-8">
-            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-center sm:text-left">
                 <div>
                     <h1 className="text-3xl font-black text-gray-800">Clinic Reports</h1>
                     <p className="text-gray-500">Real-time insights into your dental practice performance.</p>
                 </div>
-                <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100">
+                <div className="bg-indigo-50 px-4 py-2 rounded-xl border border-indigo-100 inline-block mx-auto sm:mx-0">
                     <span className="text-indigo-600 font-bold text-lg">{data.newPatientsLast30Days}</span>
                     <span className="text-indigo-800 text-sm ml-2 font-medium">New patients this month</span>
                 </div>
             </header>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Column 1: Status Breakdown */}
+                {/* Row 1: Status and Treatments */}
                 <Card title="Appointment Status" className="lg:col-span-1">
                     <div className="space-y-4">
                         {data.statusBreakdown.map((item) => (
@@ -78,7 +83,6 @@ function Reports() {
                     </div>
                 </Card>
 
-                {/* Column 2: Treatment Trends */}
                 <Card title="Top Treatments" className="lg:col-span-1">
                     <div className="space-y-6">
                         {data.treatmentTrends.map((item, idx) => (
@@ -90,7 +94,7 @@ function Reports() {
                                 <div className="w-full bg-gray-100 rounded-full h-2">
                                     <div
                                         className="bg-indigo-500 h-2 rounded-full"
-                                        style={{ width: `${(item.count / data.treatmentTrends[0].count) * 100}%` }}
+                                        style={{ width: `${(item.count / (data.treatmentTrends[0]?.count || 1)) * 100}%` }}
                                     ></div>
                                 </div>
                             </div>
@@ -98,9 +102,8 @@ function Reports() {
                     </div>
                 </Card>
 
-                {/* Column 3: Today's Summary */}
                 <Card title="Live Clinic Activity" className="lg:col-span-1">
-                    <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                         {data.todaySummary.length > 0 ? (
                             data.todaySummary.map((appt) => (
                                 <div key={appt.id} className="border-b border-gray-50 pb-4 last:border-0 hover:bg-gray-50 p-2 rounded-lg transition-colors">
@@ -121,6 +124,37 @@ function Reports() {
                     </div>
                 </Card>
             </div>
+
+            {/* Row 2: Age Distribution Histogram */}
+            <Card title="Patient Age Distribution" className="w-full">
+                <div className="h-[300px] w-full mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={data.ageDistribution}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                            <XAxis 
+                                dataKey="age_group" 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#9ca3af', fontSize: 12 }}
+                            />
+                            <YAxis 
+                                axisLine={false} 
+                                tickLine={false} 
+                                tick={{ fill: '#9ca3af', fontSize: 12 }}
+                            />
+                            <Tooltip 
+                                cursor={{ fill: '#f9fafb' }}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            />
+                            <Bar dataKey="count" radius={[6, 6, 0, 0]} barSize={60}>
+                                {data.ageDistribution.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            </Card>
         </div>
     );
 }

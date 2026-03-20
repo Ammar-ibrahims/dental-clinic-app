@@ -68,8 +68,8 @@ function PatientProfile() {
                             <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Medical Summary</h3>
                             <div className="space-y-4">
                                 <div>
-                                    <p className="text-sm text-gray-500">Gender / Blood Group</p>
-                                    <p className="font-bold text-gray-800">{profile.gender || 'Unknown'} / {profile.blood_group || 'N/A'}</p>
+                                    <p className="text-sm text-gray-500">Gender / Age / Blood Group</p>
+                                    <p className="font-bold text-gray-800">{profile.gender || 'Unknown'} / {profile.age || 'N/A'} / {profile.blood_group || 'N/A'}</p>
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-500">Medical History</p>

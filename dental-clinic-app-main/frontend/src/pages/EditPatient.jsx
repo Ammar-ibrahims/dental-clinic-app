@@ -45,6 +45,7 @@ function EditPatient({ isPatientPortal = false }) {
         gender: '',
         blood_group: '',
         medical_history: '',
+        age: '',
     });
 
     useEffect(() => {
@@ -135,9 +136,10 @@ function EditPatient({ isPatientPortal = false }) {
             const token = localStorage.getItem('token');
             const formData = new FormData();
 
-            // Append form fields
-            Object.keys(form).forEach(key => {
-                if (key !== 'document_url') {
+            // Append ONLY allowed fields
+            const allowedFields = ['name', 'email', 'phone', 'date_of_birth', 'age', 'address', 'medical_history', 'blood_group', 'gender'];
+            allowedFields.forEach(key => {
+                if (form[key] !== undefined && form[key] !== null) {
                     formData.append(key, form[key]);
                 }
             });
@@ -228,11 +230,16 @@ function EditPatient({ isPatientPortal = false }) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label htmlFor="dob" className="block text-sm font-semibold text-gray-700 mb-1">Date of Birth</label>
                             <input id="dob" type="date" name="date_of_birth" value={form.date_of_birth} onChange={handleChange}
                                 max={new Date().toISOString().split("T")[0]}
+                                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 outline-none" />
+                        </div>
+                        <div>
+                            <label htmlFor="age" className="block text-sm font-semibold text-gray-700 mb-1">Age</label>
+                            <input id="age" type="number" name="age" value={form.age} onChange={handleChange} min="0" max="120"
                                 className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-400 outline-none" />
                         </div>
                         <div>

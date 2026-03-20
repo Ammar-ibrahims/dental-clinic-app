@@ -16,7 +16,12 @@ export const getAppointmentById = (id) =>
         `SELECT a.*, d.name AS dentist_name, p.email, p.name AS patient_name
      FROM appointments a
      JOIN doctors d ON a.dentist_id = d.id
-     LEFT JOIN patients p ON a.patient_id = CAST(p.id AS VARCHAR)
+     LEFT JOIN patients p ON (
+         CASE 
+             WHEN a.patient_id::text ~ '^[0-9]+$' THEN a.patient_id::integer = p.id
+             ELSE a.patient_id::text = p.mongo_id
+         END
+     )
      WHERE a.id = $1`,
         [id]
     );

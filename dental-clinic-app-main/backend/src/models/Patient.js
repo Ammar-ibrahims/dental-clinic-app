@@ -21,6 +21,7 @@ const patientSchema = new mongoose.Schema({
         required: false
     },
     date_of_birth: Date,
+    age: Number,
     gender: String,
     blood_group: String,
     address: String,

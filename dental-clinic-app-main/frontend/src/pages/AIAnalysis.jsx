@@ -95,8 +95,8 @@ function AIAnalysis() {
     const quickQuestions = [
         "How many appointments this week?",
         "Which doctor has the most appointments?",
+        "What is the patient age distribution?",
         "What is the most common procedure?",
-        "Which patients missed appointments?"
     ];
 
     const statusData = chartData?.statusBreakdown?.map(s => ({ name: s.status, value: parseInt(s.count) })) || [];
@@ -110,8 +110,10 @@ function AIAnalysis() {
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 <div className="xl:col-span-1 flex flex-col gap-4">
-                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col" style={{ height: '520px' }}>
-                        <div className="p-5 border-b border-gray-50"><h2 className="font-black text-gray-800">💬 Ask the AI</h2></div>
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[520px] lg:h-[600px] max-h-[85vh]">
+                        <div className="p-5 border-b border-gray-50 flex justify-between items-center">
+                            <h2 className="font-black text-gray-800">💬 Ask the AI</h2>
+                        </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
                             {chatHistory.map((msg, i) => (
                                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -137,14 +139,27 @@ function AIAnalysis() {
 
                 <div className="xl:col-span-2 flex flex-col gap-6">
                     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
-                        <h2 className="font-black text-gray-800 mb-4">📅 Appointments Per Day</h2>
+                        <h2 className="font-black text-gray-800 mb-4 text-sm uppercase tracking-wider text-gray-400">📅 Appointments Per Day</h2>
                         <ResponsiveContainer width="100%" height={200}>
                             <BarChart data={chartData?.appointmentsPerDay || []}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <Tooltip />
-                                <Bar dataKey="count" fill="#6366f1" />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6">
+                        <h2 className="font-black text-gray-800 mb-4 text-sm uppercase tracking-wider text-gray-400">📊 Patient Age Distribution</h2>
+                        <ResponsiveContainer width="100%" height={200}>
+                            <BarChart data={chartData?.ageDistribution || []}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                                <XAxis dataKey="age_group" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                                <Bar dataKey="count" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
