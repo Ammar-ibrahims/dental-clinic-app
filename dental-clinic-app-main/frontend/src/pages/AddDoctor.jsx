@@ -44,7 +44,7 @@ function AddDoctor() {
 
         const digitsOnly = form.contact.replace(/[^0-9]/g, '');
         if (form.contact && digitsOnly.length !== 11) {
-            setError('Contact number must be exactly 11 digits (e.g. 0300-1234567).');
+            setError('Contact number must be exactly 11 digits (e.g. 0300-1234566).');
             return;
         }
 
